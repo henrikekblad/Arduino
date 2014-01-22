@@ -155,9 +155,11 @@ void Sensor::findRelay() {
 		EEPROM.write(EEPROM_DISTANCE_ADDRESS, distance);
 	}
 
-	// Always listen to relay pipe (relay broadcasts messages that might be for this
+	// Relay nodes always listen to relay pipe (relay broadcasts messages that might be for this
 	// nodes children)
-	RF24::openReadingPipe(RELAY_PIPE, BASE_RADIO_ID + relayId);
+	if (isRelay) {
+		RF24::openReadingPipe(RELAY_PIPE, BASE_RADIO_ID + relayId);
+	}
 }
 
 
@@ -243,40 +245,45 @@ void Sensor::sendInternal(uint8_t variableType, const char *value) {
 	sendData(radioId, GATEWAY_ADDRESS, NODE_CHILD_ID, M_INTERNAL, variableType, value, strlen(value), false);
 }
 
-// This will be added in 1.4
-/*void Sensor::sendVariable(uint8_t childId, uint8_t variableType,
-		const char *value, length) {
-	sendData(radioId, GATEWAY_ADDRESS, childId, M_SET_VARIABLE, variableType, value, length, true);
+
+/*void Sensor::sendStructure(uint8_t childId, uint8_t variableType, void *value, uint8_t len) {
+	sendData(radioId, GATEWAY_ADDRESS, childId, M_SET_VARIABLE, variableType, value, len, true);
 }*/
 
-
-void Sensor::sendVariable(uint8_t childId, uint8_t variableType,
-		const char *value) {
+void Sensor::sendVariable(uint8_t childId, uint8_t variableType, const char *value) {
 	sendData(radioId, GATEWAY_ADDRESS, childId, M_SET_VARIABLE, variableType, value, strlen(value), false);
 }
 
-void Sensor::sendVariable(uint8_t childId, uint8_t variableType, double value, int decimals) {
-    sendVariable(childId, variableType, dtostrf(value,2,decimals,convBuffer));
+void Sensor::sendString(uint8_t childId, uint8_t variableType, const char *value) {
+	sendData(radioId, GATEWAY_ADDRESS, childId, M_SET_VARIABLE, variableType, value, strlen(value), false);
 }
 
-void Sensor::sendVariable(uint8_t childId, uint8_t variableType, int value) {
+void Sensor::sendDouble(uint8_t childId, uint8_t variableType, double value, int decimals) {
+	sendVariable(childId, variableType, dtostrf(value,2,decimals,convBuffer));
+}
+
+/*void Sensor::sendFloat(uint8_t childId, uint8_t variableType, double value, int decimals) {
+	sendVariable(childId, variableType, dtostrf(value,2,decimals,convBuffer));
+}*/
+
+void Sensor::sendInt(uint8_t childId, uint8_t variableType, int value) {
     sendVariable(childId, variableType, itoa(value, convBuffer, 10));
 }
-
-void Sensor::sendVariable(uint8_t childId, uint8_t variableType, long value) {
+void Sensor::sendUInt(uint8_t childId, uint8_t variableType, unsigned int value) {
     sendVariable(childId, variableType, ltoa(value, convBuffer, 10));
 }
 
-void Sensor::sendVariable(uint8_t childId, uint8_t variableType, unsigned long value) {
+void Sensor::sendLong(uint8_t childId, uint8_t variableType, long value) {
+    sendVariable(childId, variableType, ltoa(value, convBuffer, 10));
+}
+void Sensor::sendULong(uint8_t childId, uint8_t variableType, unsigned long value) {
     sendVariable(childId, variableType, ltoa(value, convBuffer, 10));
 }
 
-void Sensor::sendVariable(uint8_t childId, uint8_t variableType, unsigned int value) {
-    sendVariable(childId, variableType, ltoa(value, convBuffer, 10));
-}
 
-void Sensor::sendVariable(uint8_t nodeId, uint8_t childId, uint8_t variableType,
-		const char *value) {
+/*
+
+void Sensor::sendString(uint8_t nodeId, uint8_t childId, uint8_t variableType, const char *value) {
 	sendData(radioId, nodeId, childId, M_SET_VARIABLE, variableType, value, strlen(value), false);
 }
 
@@ -299,6 +306,7 @@ void Sensor::sendVariable(uint8_t nodeId, uint8_t childId, uint8_t variableType,
 void Sensor::sendVariable(uint8_t nodeId, uint8_t childId, uint8_t variableType, unsigned int value) {
     sendVariable(nodeId, childId, variableType, ltoa(value, convBuffer, 10));
 }
+*/
 
 void Sensor::sendSensorPresentation(uint8_t childId, uint8_t sensorType) {
 	sendData(radioId, GATEWAY_ADDRESS, childId, M_PRESENTATION, sensorType, LIBRARY_VERSION, strlen(LIBRARY_VERSION), false);
@@ -317,7 +325,8 @@ void Sensor::sendBatteryLevel(int value) {
 }
 
 char* Sensor::get(uint8_t nodeId, uint8_t childId, uint8_t sendType, uint8_t receiveType, uint8_t variableType) {
-	while (1) {
+	int retry = 5;
+	do {
 		sendData(radioId, nodeId, childId, sendType, variableType, "", 0, false);
 		uint8_t i = 0;
 		while (i < 100) {  // 5 seconds timeout before re-sending status request
@@ -332,7 +341,7 @@ char* Sensor::get(uint8_t nodeId, uint8_t childId, uint8_t sendType, uint8_t rec
 			delay(50);
 			i++;
 		}
-	}
+	while (--retry);
 	return NULL;
 }
 

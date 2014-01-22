@@ -30,8 +30,9 @@
 #define debug(x,...)
 #endif
 
-#define LIBRARY_VERSION "1.2+"
-#define PROTOCOL_VERSION 1
+
+#define LIBRARY_VERSION "1.4"
+#define PROTOCOL_VERSION 2
 #define BAUD_RATE 115200
 
 #define AUTO 0xFF // 0-254. Id 255 is reserved for auto initialization of radioId.
@@ -70,7 +71,7 @@ typedef enum {
 	V_RAINRATE, V_WIND, V_GUST, V_DIRECTION, V_UV, V_WEIGHT, V_DISTANCE,
 	V_IMPEDANCE, V_ARMED, V_TRIPPED, V_WATT, V_KWH, V_SCENE_ON, V_SCENE_OFF,
 	V_HEATER, V_HEATER_SW, V_LIGHT_LEVEL, V_VAR1, V_VAR2, V_VAR3, V_VAR4, V_VAR5,
-	V_UP, V_DOWN, V_STOP, V_IR_SEND, V_IR_RECEIVE, V_FLOW, V_VOLUME
+	V_UP, V_DOWN, V_STOP, V_IR_SEND, V_IR_RECEIVE
 } variableType;
 
 // Internal messages
@@ -84,8 +85,17 @@ typedef enum {
 typedef enum {
 	S_DOOR, S_MOTION, S_SMOKE, S_LIGHT, S_DIMMER, S_COVER, S_TEMP, S_HUM, S_BARO, S_WIND,
 	S_RAIN, S_UV, S_WEIGHT, S_POWER, S_HEATER, S_DISTANCE, S_LIGHT_LEVEL, S_ARDUINO_NODE,
-	S_ARDUINO_RELAY, S_LOCK, S_IR, S_WATER
+	S_ARDUINO_RELAY, S_LOCK, S_IR
 } sensor;
+
+
+/*
+// Possible data types when sending variables.
+enum {
+	T_CUSTOM, T_CHAR, T_INT, T_UINT, T_LONG, T_ULONG, T_FLOAT, T_DOUBLE
+} sendDataTypes;
+
+*/
 
 // Possible return values by validate() when doing crc check of received message.
 enum {
@@ -94,16 +104,16 @@ enum {
 
 // The message structure
 typedef struct {
-  uint8_t crc       	 	 : 8;    // 8 bits crc
-  uint8_t version       	 : 3;    // 3 bits protocol version
-  uint8_t binary			 : 1; 	 // 1 bit. Data is binary and should be encoded when sent to sensor net gateway
-  uint8_t from				 : 8;	 // 8 bits. RadioId of sender node
-  uint8_t to      	         : 8;    // 8 bits. RadioId of destination node
-  uint8_t last     	         : 8;    // 8 bits. RadioId of last node this message passed
-  uint8_t childId            : 8;	 // 1 byte. Up to MAX_CHILD_DEVICES child sensors per radioId
-  uint8_t messageType        : 4;    // 4 bits. Type of message. See messageType
+  uint8_t crc;    // 8 bits crc
+  uint8_t version;    // (3 bits) protocol version
+  uint8_t binary; 	 // (1 bit). Data is binary and should be encoded when sent to sensor net gateway
+  uint8_t from;	 // 8 bits. RadioId of sender node
+  uint8_t to;    // 8 bits. RadioId of destination node
+  uint8_t last;    // 8 bits. RadioId of last node this message passed
+  uint8_t childId;	 // 8 bits. Up to MAX_CHILD_DEVICES child sensors per radioId
+  uint8_t messageType;    // (4 bits). Type of message. See messageType
 
-  uint8_t type               : 8;	 // 8 bits. variableType or deviceType depending on messageType
+  uint8_t type;	 // 8 bits. variableType or deviceType depending on messageType
 } header_s;
 
 typedef struct {
@@ -134,8 +144,6 @@ class Sensor : public RF24
 	void begin(uint8_t _radioId);
 
 
-	uint8_t getRadioId();
-
 	/**
 	* The arduino node must send a presentation of all the sensors connected before any
 	* variable changes will be registered on sensor net gateway side.
@@ -157,19 +165,25 @@ class Sensor : public RF24
 	* @param value  New value of the variable
 	*/
 
+	//REMOVE THIS
 	void sendVariable(uint8_t childId, uint8_t variableType, const char *value);
-	void sendVariable(uint8_t childId, uint8_t variableType, double value, int decimals);
-	void sendVariable(uint8_t childId, uint8_t variableType, unsigned long value);
-	void sendVariable(uint8_t childId, uint8_t variableType, long value);
-	void sendVariable(uint8_t childId, uint8_t variableType, unsigned int value);
-	void sendVariable(uint8_t childId, uint8_t variableType, int value);
 
-	void sendVariable(uint8_t radioId, uint8_t childId, uint8_t variableType, const char *value);
-	void sendVariable(uint8_t radioId, uint8_t childId, uint8_t variableType, double value, int decimals);
-	void sendVariable(uint8_t radioId, uint8_t childId, uint8_t variableType, unsigned long value);
-	void sendVariable(uint8_t radioId, uint8_t childId, uint8_t variableType, long value);
-	void sendVariable(uint8_t radioId, uint8_t childId, uint8_t variableType, unsigned int value);
-	void sendVariable(uint8_t radioId, uint8_t childId, uint8_t variableType, int value);
+
+	//void sendStructure(uint8_t childId, uint8_t variableType, void *data, uint8_t len);
+	void sendString(uint8_t childId, uint8_t variableType, const char *value);
+	void sendDouble(uint8_t childId, uint8_t variableType, double value, int decimals);
+	void sendULong(uint8_t childId, uint8_t variableType, unsigned long value);
+	void sendLong(uint8_t childId, uint8_t variableType, long value);
+	void sendUInt(uint8_t childId, uint8_t variableType, unsigned int value);
+	void sendInt(uint8_t childId, uint8_t variableType, int value);
+
+	void sendVariableNode(uint8_t radioId, uint8_t childId, uint8_t variableType, void *data, uint8_t length);
+	void sendVariableNode(uint8_t radioId, uint8_t childId, uint8_t variableType, const char *value);
+	void sendVariableNode(uint8_t radioId, uint8_t childId, uint8_t variableType, double value, int decimals);
+	void sendVariableNode(uint8_t radioId, uint8_t childId, uint8_t variableType, unsigned long value);
+	void sendVariableNode(uint8_t radioId, uint8_t childId, uint8_t variableType, long value);
+	void sendVariableNode(uint8_t radioId, uint8_t childId, uint8_t variableType, unsigned int value);
+	void sendVariableNode(uint8_t radioId, uint8_t childId, uint8_t variableType, int value);
 
 
 	/**
@@ -236,6 +250,8 @@ class Sensor : public RF24
 	 * Validates consistency of the message including CRC and protocol version
 	 */
 	uint8_t validate();
+
+	uint8_t getRadioId();
 
 
 #ifdef DEBUG
