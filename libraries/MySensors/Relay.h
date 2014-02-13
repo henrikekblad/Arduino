@@ -37,7 +37,12 @@ class Relay : public Sensor
 		* @param _cepin The pin attached to RF24 Chip Enable on the RF module
 		* @param _cspin The pin attached to RF24 Chip Select
 		*/
+#ifndef RPI
 		Relay(uint8_t _cepin, uint8_t _cspin);
+#else
+                Relay(string _spidevice, uint32_t _spispeed, uint8_t _cepin);
+#endif
+
 
 		void begin(uint8_t _radioId=AUTO);
 		boolean messageAvailable();
@@ -52,6 +57,9 @@ class Relay : public Sensor
 		uint8_t childNodeTable[256]; // Buffer to store child node information. Store this in EEPROM
 
 		uint8_t getChildRoute(uint8_t childId);
+#ifdef RPI
+                void randomSeed(unsigned long int seed);
+#endif
 		void addChildRoute(uint8_t childId, uint8_t route);
 		void removeChildRoute(uint8_t childId);
 		void clearChildRoutes();

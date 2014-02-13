@@ -11,6 +11,7 @@
 
 #include "Gateway.h"
 
+#ifndef RPI
 Gateway::Gateway(uint8_t _cepin, uint8_t _cspin, uint8_t _inclusion_time) : Relay(_cepin, _cspin) {
 	ledMode = false;
 	isRelay = true;
@@ -26,6 +27,14 @@ Gateway::Gateway(uint8_t _cepin, uint8_t _cspin, uint8_t _inclusion, uint8_t _in
 	pinTx = _tx;
 	pinEr = _er;
 }
+#else
+using namespace std;
+Gateway::Gateway(string _spidevice, uint32_t _spispeed, uint8_t _cepin, uint8_t _inclusion_time) : Relay(_spidevice, _spispeed, _cepin) {
+        ledMode = false;
+        inclusionTime = _inclusion_time;
+}
+#endif
+
 
 void Gateway::begin(uint8_t _radioId, void (*inDataCallback)(char *)) {
 
@@ -65,7 +74,9 @@ void Gateway::begin(uint8_t _radioId, void (*inDataCallback)(char *)) {
 	}
 
 	// Set baudrate of serial link
+#ifndef RPI
 	Serial.begin(BAUD_RATE);
+#endif
 
 	// Start up the radio library
 	setupRadio();
@@ -203,11 +214,20 @@ void Gateway::processRadioMessage() {
 }
 
 void Gateway::serial(const char *fmt, ... ) {
+#ifndef RPI
    va_list args;
    va_start (args, fmt );
    vsnprintf_P(serialBuffer, MAX_SEND_LENGTH, fmt, args);
    va_end (args);
    Serial.print(serialBuffer);
+#else
+ va_list args;
+   va_start (args, fmt );
+   vsnprintf(serialBuffer, MAX_SEND_LENGTH, fmt, args);
+   va_end (args);
+   writeJs(serialBuffer);
+#endif
+
    if (useWriteCallback) {
 	   // We have a registered write callback (probably Ethernet)
 	   dataCallback(serialBuffer);

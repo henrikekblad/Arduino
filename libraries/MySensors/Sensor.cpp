@@ -12,9 +12,18 @@
 #include "Sensor.h"
 
 
+#ifndef RPI
 Sensor::Sensor(uint8_t _cepin, uint8_t _cspin) : RF24(_cepin, _cspin) {
 	isRelay = false;
 }
+#else
+using namespace std;
+Sensor::Sensor(string _spidevice, uint32_t _spispeed, uint8_t _cepin) : RF24(_spidevice, _spispeed, _cepin) {
+	isRelay = false;
+        fprintf(stderr,"Sensor-1");
+}
+#endif
+
 
 
 void Sensor::setupRadio() {
@@ -43,10 +52,17 @@ void Sensor::begin(uint8_t _radioId) {
 
 	setupRadio();
 
+#ifndef RPI
+
 	// Fetch relay from EEPROM
 	relayId = EEPROM.read(EEPROM_RELAY_ID_ADDRESS);
 	// Fetch distance from eeprom
 	distance = EEPROM.read(EEPROM_DISTANCE_ADDRESS);
+#else
+      relayId = 0;
+      distance = 0;
+#endif
+
 	if (relayId == 0xff) {
 		// No relay previously fetched and stored in eeprom. Try to find one.
 		findRelay();
@@ -79,7 +95,12 @@ uint8_t Sensor::getRadioId() {
 
 void Sensor::initializeRadioId() {
 	if (radioId == AUTO) {
+#ifndef RPI
 		radioId = EEPROM.read(EEPROM_RADIO_ID_ADDRESS);
+#else
+                radioId = 0;
+#endif
+
 		if (radioId == 0xFF || radioId == 0) {
 			radioId = AUTO;
 			debug(PSTR("No radio id found in EEPROM fetching one from sensor net gateway\n"));
@@ -94,7 +115,9 @@ void Sensor::initializeRadioId() {
 				while (1) {} // Wait here. Nothing else we can do...
 			} else {
 				debug(PSTR("Radio id received: %d\n"), radioId);
+#ifndef RPI
 				EEPROM.write(EEPROM_RADIO_ID_ADDRESS, radioId);
+#endif
 			}
 		}
 		debug(PSTR("Radio id stored in EEPROM was: %d\n"), radioId);
@@ -154,8 +177,11 @@ void Sensor::findRelay() {
 
 	// Store new relay address in EEPROM
 	if (relayId != oldRelayId) {
+#ifndef RPI
 		EEPROM.write(EEPROM_RELAY_ID_ADDRESS, relayId);
 		EEPROM.write(EEPROM_DISTANCE_ADDRESS, distance);
+#endif
+
 	}
 }
 
@@ -225,9 +251,19 @@ boolean Sensor::sendWrite(uint8_t dest, message_s message, int length) {
 	int retry = WRITE_RETRY;
 	RF24::stopListening();
 	RF24::openWritingPipe(TO_ADDR(dest));
-	RF24::write(&message, min(MAX_MESSAGE_LENGTH, sizeof(message.header) + length), broadcast);
+#ifndef RPI
+	RF24::write(&message, min(const unsigned int) MAX_MESSAGE_LENGTH, (const unsigned int) (sizeof(message.header) + length)), broadcast);
+#else
+        if (broadcast)
+        {
+            debug(PSTR("Broadcast NOT SUPPORTED on RPI\n"));
+        } 
+        RF24::write(&message, min((const unsigned int) MAX_MESSAGE_LENGTH, (const unsigned int) (sizeof(message.header) + length)));
+#endif
 	RF24::startListening();
+#ifndef RPI
 	RF24::closeReadingPipe(WRITE_PIPE); // Stop listening to write-pipe after transmit
+#endif
 
 	if (!broadcast) {
 		// ---------------- WAIT FOR ACK ------------------
@@ -436,7 +472,9 @@ boolean Sensor::readMessage() {
 		RF24::openWritingPipe(TO_ADDR(msg.header.last));
 		RF24::write(&radioId, sizeof(uint8_t));
 		RF24::startListening();
+#ifndef RPI
 		RF24::closeReadingPipe(WRITE_PIPE); // Stop listening to write-pipe after transmit
+#endif
 	}
 	uint8_t cb = msg.header.crc;
 	uint8_t valid = validate(len-sizeof(header_s));
@@ -505,7 +543,90 @@ uint8_t Sensor::validate(uint8_t length) {
 	return VALIDATE_OK;
 }
 
-#ifdef DEBUG
+#ifdef RPI
+unsigned long Sensor::millis()
+{
+    timeval curTime;
+    gettimeofday(&curTime, NULL);
+    return curTime.tv_usec / 1000;
+}
+
+/**
+	 * C++ version 0.4 char* style "itoa":
+	 * Written by Lukás Chmela
+	 * Released under GPLv3.
+	 */
+	char* Sensor::itoa(int value, char* result, int base) {
+		// check that the base if valid
+		if (base < 2 || base > 36) { *result = '\0'; return result; }
+	
+		char* ptr = result, *ptr1 = result, tmp_char;
+		int tmp_value;
+	
+		do {
+			tmp_value = value;
+			value /= base;
+			*ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz" [35 + (tmp_value - value * base)];
+		} while ( value );
+	
+		// Apply negative sign
+		// Apply negative sign
+		if (tmp_value < 0) *ptr++ = '-';
+		*ptr-- = '\0';
+		while(ptr1 < ptr) {
+			tmp_char = *ptr;
+			*ptr--= *ptr1;
+			*ptr1++ = tmp_char;
+		}
+		return result;
+	}
+/**
+	 * C++ version 0.4 char* style "itoa":
+	 * Written by Lukás Chmela
+	 * Released under GPLv3.
+	 */
+	char* Sensor::ltoa(long value, char* result, int base) {
+		// check that the base if valid
+		if (base < 2 || base > 36) { *result = '\0'; return result; }
+	
+		char* ptr = result, *ptr1 = result, tmp_char;
+		long tmp_value;
+	
+		do {
+			tmp_value = value;
+			value /= base;
+			*ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz" [35 + (tmp_value - value * base)];
+		} while ( value );
+	
+		// Apply negative sign
+		if (tmp_value < 0) *ptr++ = '-';
+		*ptr-- = '\0';
+		while(ptr1 < ptr) {
+			tmp_char = *ptr;
+			*ptr--= *ptr1;
+			*ptr1++ = tmp_char;
+		}
+		return result;
+	}
+char * Sensor::dtostrf(float f, int width, int decimals, char *result)
+{
+    char widths[3];
+    char decimalss[3];  
+    char format[100];
+    itoa(width,widths,10);
+    itoa(decimals,decimalss,10);
+    strcpy(format,"%");
+    strcat(format,widths);
+    strcat(format,".");
+    strcat(format,decimalss);
+    strcat(format,"f");
+  
+    sprintf(result,format,f);
+    return result;
+}
+#endif
+
+#if defined DEBUG && !defined RPI 
 void Sensor::debugPrint(const char *fmt, ... ) {
 	char fmtBuffer[300];
 	if (radioId == GATEWAY_ADDRESS) {
@@ -531,13 +652,31 @@ void Sensor::debugPrint(const char *fmt, ... ) {
 	//Serial.print("0;0;4;11;Mem free:");
 	//Serial.println(freeRam());
 }
+#elif defined DEBUG && defined RPI
+void Sensor::debugPrint(const char *fmt, ...) {
+ char fmtBuffer[300];
+ va_list args;
+ va_start (args, fmt );
+    vsnprintf(fmtBuffer, 300, fmt, args);
+    va_end (args);
+    fmtBuffer[98] = '\0';
+    fprintf(stderr, fmtBuffer);
+}
+#else
+void Sensor::debugPrint(const char *fmt, ...) {
+    printf("Hej");
+}
 #endif
 
 
-#ifdef DEBUG
+#if defined DEBUG && !defined RPI
 int Sensor::freeRam (void) {
   extern int __heap_start, *__brkval;
   int v;
   return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
+#elif defined DEBUG && defined RPI
+int Sensor::freeRam (void) {
+  return 0; // To be implemented
 }
 #endif

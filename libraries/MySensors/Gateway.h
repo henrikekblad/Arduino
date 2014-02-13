@@ -13,6 +13,11 @@
 #define Gateway_h
 
 #include "Relay.h"
+#ifdef RPI
+#include <sys/time.h>
+#include "../../Raspberry/RadioGateway.h"
+#endif
+
 
 #define MAX_RECEIVE_LENGTH 100 // Max buffersize needed for messages coming from vera
 #define MAX_SEND_LENGTH 120 // Max buffersize needed for messages coming from vera
@@ -36,8 +41,13 @@ class Gateway : public Relay
 		* @param _er Digital pin for error led
 		*
 		*/
+#ifndef RPI
 		Gateway(uint8_t _cepin, uint8_t _cspin, uint8_t _inclusion_time);
 		Gateway(uint8_t _cepin, uint8_t _cspin, uint8_t _inclusion, uint8_t _inclusion_time, uint8_t _rx, uint8_t _tx, uint8_t _er);
+#else
+                Gateway(string _spidevice, uint32_t _spispeed, uint8_t _cepin, uint8_t _inclusion_time);
+#endif
+
 
 		/* Use this and pass a function that should be called when you want to process commands that arrive from radio network */
 		void begin(uint8_t _radioId=AUTO, void (*dataCallback)(char *)=NULL);

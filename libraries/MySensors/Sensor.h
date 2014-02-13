@@ -11,15 +11,33 @@
 
 #ifndef Sensor_h
 #define Sensor_h
+#ifdef RPI
+typedef bool boolean;
+typedef char * String;
+
+#include <cstdlib>
+#include <stdlib.h>
+#include <cstdlib>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <string>
+#include <getopt.h>
+#include <cstdlib>
+#include <iostream>
+
+#else
+#include <Arduino.h>
+#include <SPI.h>
+#include <EEPROM.h>
+#include <avr/progmem.h>
+#endif
+
 
 #include <nRF24L01.h>
 #include <RF24.h>
 #include <RF24_config.h>
-#include <Arduino.h>
 #include <stddef.h>
-#include <SPI.h>
-#include <EEPROM.h>
-#include <avr/progmem.h>
 #include <stdarg.h>
 
 //#define DEBUG
@@ -97,16 +115,16 @@ enum {
 
 // The message structure
 typedef struct {
-  uint8_t crc       	 	 : 8;    // 8 bits crc
-  uint8_t version       	 : 3;    // 3 bits protocol version
-  uint8_t binary			 : 1; 	 // 1 bit. Data is binary and should be encoded when sent to sensor net gateway
-  uint8_t from				 : 8;	 // 8 bits. RadioId of sender node
-  uint8_t to      	         : 8;    // 8 bits. RadioId of destination node
-  uint8_t last     	         : 8;    // 8 bits. RadioId of last node this message passed
-  uint8_t childId            : 8;	 // 1 byte. Up to MAX_CHILD_DEVICES child sensors per radioId
-  uint8_t messageType        : 4;    // 4 bits. Type of message. See messageType
+  uint8_t crc       	 	 ;    // 8 bits crc
+  uint8_t version       	 ;    // was 3 bits protocol version
+  uint8_t binary		 ; 	 // was 1 bit. Data is binary and should be encoded when sent to sensor net gateway
+  uint8_t from			 ;	 // 8 bits. RadioId of sender node
+  uint8_t to      	         ;    // 8 bits. RadioId of destination node
+  uint8_t last     	         ;    // 8 bits. RadioId of last node this message passed
+  uint8_t childId                ;	 // 1 byte. Up to MAX_CHILD_DEVICES child sensors per radioId
+  uint8_t messageType            ;    // was 4 bits. Type of message. See messageType
 
-  uint8_t type               : 8;	 // 8 bits. variableType or deviceType depending on messageType
+  uint8_t type                   ;	 // 8 bits. variableType or deviceType depending on messageType
 } header_s;
 
 typedef struct {
@@ -126,7 +144,11 @@ class Sensor : public RF24
 	* @param _cepin The pin attached to RF24 Chip Enable on the RF module
 	* @param _cspin The pin attached to RF24 Chip Select
 	*/
+#ifndef RPI
 	Sensor(uint8_t _cepin, uint8_t _cspin);
+#else
+        Sensor(string _spidevice, uint32_t _spispeed, uint8_t _cepin);
+#endif
 
 	/**
 	* Begin operation of the sensor net library
@@ -254,6 +276,13 @@ class Sensor : public RF24
 	uint8_t relayId;
 	message_s msg;  // Buffer for incoming messages.
 	char convBuffer[20];
+
+#ifdef RPI
+        long unsigned int millis();
+        char * itoa(int value, char *result, int base);
+        char * ltoa(long value, char *result, int base);
+        char * dtostrf(float f, int width, int decimals, char *result);
+#endif
 
 	void setupRadio();
 	void findRelay();

@@ -11,9 +11,15 @@
 
 #include "Relay.h"
 
+#ifndef RPI
 Relay::Relay(uint8_t _cepin, uint8_t _cspin) : Sensor(_cepin, _cspin) {
 	isRelay = true;
 }
+#else
+Relay::Relay(string _spidevice, uint32_t _spispeed, uint8_t _cepin) : Sensor(_spidevice, _spispeed, _cepin) {
+        isRelay = true;
+}
+#endif
 
 
 void Relay::begin(uint8_t _radioId) {
@@ -21,7 +27,12 @@ void Relay::begin(uint8_t _radioId) {
 
 	// Read routing table from EEPROM
 	for (int i=0;i<sizeof(childNodeTable);i++) {
+#ifndef RPI
 		childNodeTable[i] = EEPROM.read(EEPROM_ROUTES_ADDRESS+i);
+#else
+                childNodeTable[i] = 0;
+#endif
+
 	}
 }
 
@@ -96,7 +107,12 @@ boolean Relay::messageAvailable() {
 					// Wait a random delay of 0-2 seconds to minimize collision
 					// between ping ack messages from other relaying nodes
 					randomSeed(millis());
+#ifndef RPI
 					delay(random(2000));
+#else
+                                        delay(random() % 2000);
+#endif
+
 					ltoa(distance, convBuffer, 10);
 					uint8_t to = msg.header.from;
 					debug(PSTR("Answer ping message. %d\n"), strlen(convBuffer));
@@ -151,8 +167,12 @@ boolean Relay::messageAvailable() {
 	return false;
 }
 
-
-
+#ifdef RPI
+void Relay::randomSeed(unsigned long int seed)
+{
+    srand(seed);
+}
+#endif
 
 void Relay::relayMessage(uint8_t length, uint8_t pipe) {
 	uint8_t route = getChildRoute(msg.header.to);
@@ -218,14 +238,18 @@ void Relay::relayMessage(uint8_t length, uint8_t pipe) {
 void Relay::addChildRoute(uint8_t childId, uint8_t route) {
 	if (childNodeTable[childId] != route) {
 		childNodeTable[childId] = route;
+#ifndef RPI
 		EEPROM.write(EEPROM_ROUTES_ADDRESS+childId, route);
+#endif
 	}
 }
 
 void Relay::removeChildRoute(uint8_t childId) {
 	if (childNodeTable[childId] != 0xff) {
 		childNodeTable[childId] = 0xff;
+#ifndef RPI
 		EEPROM.write(EEPROM_ROUTES_ADDRESS+childId, 0xff);
+#endif
 	}
 }
 
