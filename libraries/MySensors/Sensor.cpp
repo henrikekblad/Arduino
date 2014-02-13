@@ -252,7 +252,7 @@ boolean Sensor::sendWrite(uint8_t dest, message_s message, int length) {
 	RF24::stopListening();
 	RF24::openWritingPipe(TO_ADDR(dest));
 #ifndef RPI
-	RF24::write(&message, min(const unsigned int) MAX_MESSAGE_LENGTH, (const unsigned int) (sizeof(message.header) + length)), broadcast);
+	RF24::write(&message, min(MAX_MESSAGE_LENGTH, sizeof(message.header) + length), broadcast);
 #else
         if (broadcast)
         {
@@ -661,10 +661,6 @@ void Sensor::debugPrint(const char *fmt, ...) {
     va_end (args);
     fmtBuffer[98] = '\0';
     fprintf(stderr, fmtBuffer);
-}
-#else
-void Sensor::debugPrint(const char *fmt, ...) {
-    printf("Hej");
 }
 #endif
 
