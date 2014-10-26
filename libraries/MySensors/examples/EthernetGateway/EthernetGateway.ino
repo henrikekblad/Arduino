@@ -33,9 +33,12 @@
  * - ERR (red) - fast blink on error during transmission error or recieve crc error  
  * 
  *  ----------- Connection guide ---------------------------------------------------------------------------
- *  13  Radio & Ethernet SPI SCK          
- *  12  Radio & Ethernet SPI MISO (SO)
- *  11  Radio & Ethernet SPI MOSI (SI)
+ *  16  Radio SPI MISO
+ *  15  Radio SPI MOSI
+ *  14  Radio SPI SCK 
+ *  13  Ethernet SPI SCK          
+ *  12  Ethernet SPI MISO (SO)
+ *  11  Ethernet SPI MOSI (SI)
  *  10  Ethernet SPI Slave Select (CS)    Pin 10, the SS pin, must be an o/p to put SPI in master mode
  *  9   Radio TX LED using on board LED   (optional)  +5V -> LED -> 270-330 Ohm resistor -> pin 9.
  *  8   Radio RX LED                      (optional)  +5V -> LED -> 270-330 Ohm resistor -> pin 8.
@@ -51,6 +54,7 @@
 #define NO_PORTB_PINCHANGES 
 
 #include <SPI.h>  
+#include <DigitalIO.h>  
 #include <MySensor.h>  
 #include <stdarg.h>
 #include <MsTimer2.h>
@@ -71,7 +75,6 @@
 #define INCLUSION_MODE_TIME 1 // Number of minutes inclusion mode is enabled
 #define INCLUSION_MODE_PIN  3 // Digital pin used for inclusion mode button
 
-#define W5100_SPI_EN        4  // Ethernet SPI enable (where available)
 #define RADIO_CE_PIN        5  // radio chip enable
 #define RADIO_SPI_SS_PIN    6  // radio SPI serial select
 
@@ -99,41 +102,19 @@ char inputString[MAX_RECEIVE_LENGTH] = "";    // A string to hold incoming comma
 int inputPos = 0;
 bool sentReady = false;
 
-void w5100_spi_en(boolean enable)
-{
-#ifdef W5100_SPI_EN
-  if (enable)
-  {
-    // Pull up pin
-    pinMode(W5100_SPI_EN, INPUT);
-    digitalWrite(W5100_SPI_EN, HIGH);
-  }
-  else
-  {
-    // Ground pin
-    pinMode(W5100_SPI_EN, OUTPUT);
-    digitalWrite(W5100_SPI_EN, LOW);
-  }
-#endif
-}
-
 void output(const char *fmt, ... ) {
    va_list args;
    va_start (args, fmt );
    vsnprintf_P(serialBuffer, MAX_SEND_LENGTH, fmt, args);
    va_end (args);
    Serial.print(serialBuffer);
-   w5100_spi_en(true);
    server.write(serialBuffer);
-   w5100_spi_en(false);
 }
 
 void setup()  
 { 
-  w5100_spi_en(false);
   // Initialize gateway at maximum PA level, channel 70 and callback for write operations 
   gw.begin(incomingMessage, 0, true, 0);
-  w5100_spi_en(true);
 
   Ethernet.begin(mac, myIp);
   setupGateway(RADIO_RX_LED_PIN, RADIO_TX_LED_PIN, RADIO_ERROR_LED_PIN, INCLUSION_MODE_PIN, INCLUSION_MODE_TIME, output);
@@ -150,7 +131,6 @@ void setup()
   
   // start listening for clients
   server.begin();
-  w5100_spi_en(false);
 
   output(PSTR("0;0;%d;0;%d;Gateway startup complete.\n"),  C_INTERNAL, I_GATEWAY_READY);
 
@@ -167,7 +147,6 @@ void loop()
 
   // if an incoming client connects, there will be
   // bytes available to read via the client object
-  w5100_spi_en(true);
   EthernetClient client = server.available();
 
   if (client) {
@@ -192,7 +171,6 @@ void loop()
               // echo the string to the serial port
               Serial.print(inputString);
 
-              w5100_spi_en(false);
               parseAndSend(gw, inputString);
 
               // clear the string:
@@ -208,7 +186,6 @@ void loop()
         }
       }
    } 
-  w5100_spi_en(false);
 }
 
 

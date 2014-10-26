@@ -1,13 +1,6 @@
 #ifndef MyCommDriver_h
 #define MyCommDriver_h
 
-#include "MyConfig.h"
-#include "MyDriver.h"
-#include <stdint.h>
-#include "utility/RF24.h"
-#include "utility/RF24_config.h"
-
-
 
 #ifdef MYSENSORS_SENSOR
 #define RF24_CE_PIN		   9
@@ -22,10 +15,19 @@
 #endif
 
 #ifdef MYSENSORS_ETHERNET_MQTT_GATEWAY
+#define SOFTSPI    // W5100 Ethernet has a serious problem co-exist with radio on the SPI bus. Lets use SoftSPI for radio.
 #define RF24_CE_PIN		   5
 #define RF24_CS_PIN		   6
 #define RF24_PA_LEVEL 	   RF24_PA_LOW
 #endif
+
+
+#include "MyConfig.h"
+#include "MyDriver.h"
+#include <stdint.h>
+#include "utility/RF24.h"
+#include "utility/RF24_config.h"
+
 
 #define RF24_CHANNEL	   76             //RF channel for the sensor net, 0-127
 #define RF24_DATARATE 	   RF24_250KBPS   //RF24_250KBPS for 250kbs, RF24_1MBPS for 1Mbps, or RF24_2MBPS for 2Mbps

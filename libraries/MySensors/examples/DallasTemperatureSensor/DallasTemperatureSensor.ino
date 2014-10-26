@@ -19,7 +19,7 @@ int numSensors=0;
 boolean receivedConfig = false;
 boolean metric = true; 
 // Initialize temperature message
-MyMessage msg(0,V_TEMP);
+MyMessage msg(0,V_LEVEL);
 
 void setup()  
 { 
@@ -37,7 +37,7 @@ void setup()
 
   // Present all sensors to controller
   for (int i=0; i<numSensors && i<MAX_ATTACHED_DS18B20; i++) {   
-     gw.present(i, S_TEMP);
+     gw.present(i, S_THERMOMETER);
   }
 }
 

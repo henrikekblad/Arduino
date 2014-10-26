@@ -16,7 +16,6 @@
 #include "MySensor.h"
 #include "MyOtaBootloaderRF24.h"
 
-#define FIRMWARE_BLOCK_SIZE	16
 
 struct FirmwareConfig
 {
@@ -26,34 +25,6 @@ struct FirmwareConfig
 	uint16_t crc;
 };
 
-typedef struct
-{
-	uint16_t type;
-	uint16_t version;
-} FirmwareConfigRequest;
-
-typedef struct
-{
-	uint16_t type;
-	uint16_t version;
-	uint16_t blocks;
-	uint16_t crc;
-} FirmwareConfigResponse;
-
-typedef struct
-{
-	uint16_t type;
-	uint16_t version;
-	uint16_t block;
-} FirmwareRequest;
-
-typedef struct
-{
-	uint16_t type;
-	uint16_t version;
-	uint16_t block;
-	uint8_t data[FIRMWARE_BLOCK_SIZE];
-} FirmwareResponse;
 
 static struct NodeConfig nc;
 static struct FirmwareConfig fc;

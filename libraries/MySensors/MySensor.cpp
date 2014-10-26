@@ -363,15 +363,6 @@ boolean MySensor::process() {
 						cc.isMetric = isMetric;
 						eeprom_write_byte((uint8_t*)EEPROM_CONTROLLER_CONFIG_ADDRESS, isMetric);
 					}
-				} else if (type == I_CHILDREN) {
-					if (repeaterMode && msg.getString()[0] == 'C') {
-						// Clears child relay data for this node
-						debug(PSTR("rd=clear\n"));
-						for (uint8_t i=0;i< sizeof(childNodeTable); i++) {
-							removeChildRoute(i);
-						}
-						sendRoute(build(msg, nc.nodeId, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_INTERNAL, I_CHILDREN,false).set(""));
-					}
 				}
 				return false;
 			}

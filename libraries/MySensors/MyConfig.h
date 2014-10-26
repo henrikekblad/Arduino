@@ -11,14 +11,20 @@
 //#define MYSENSORS_ETHERNET_MQTT_GATEWAY
 
 // Choose radio type by enabling one of the following
-#define MYSENSORS_RF_NRF24
 
+#define MYSENSORS_RF_NRF24 // You'll find additional RF24 specific configurarion in MyDriverNRF24.cpp
+#define MYSENSORS_RF_RFM69
 
 
 #ifdef MYSENSORS_RF_NRF24
 #include "MyDriverNRF24.h"
 typedef class MyDriverNRF24 MyDriverClass;
 #endif
+
+#ifdef MYSENSORS_RF_RFM69
+// Nothing here yet
+#endif
+
 
 /***
  * Enable/Disable debug logging
