@@ -20,22 +20,53 @@
 
 #define PROTOCOL_VERSION 3
 #define MAX_MESSAGE_LENGTH 32
-#define HEADER_SIZE 7									// SETt/REQ command header size
-#define MAX_PAYLOAD (MAX_MESSAGE_LENGTH - HEADER_SIZE)	// Max payload for SET/REQ commands
+#define NETWORK_HEADER_SIZE 7									// SETt/REQ command header size
+#define MAX_PAYLOAD (MAX_MESSAGE_LENGTH - NETWORK_HEADER_SIZE)	// Max payload for SET/REQ commands
 
 /// Message types
 typedef enum {
-	/// Internal commands used by the API
-	C_INTERNAL = 0,
 	/// Push data or comands to sensor or controller
-	C_SET = 1,
+	C_SET,
 	/// Request data from sensor or controller
-	C_REQ = 2,
-	/// Firmware OTA transmissions.
-	C_FIRMWARE = 3
+	C_REQ,
+
+	/// Firmware OTA transmission commands.
+	C_FIRMWARE_CONFIG_REQUEST,
+	C_FIRMWARE_CONFIG_RESPONSE,
+	C_FIRMWARE_REQUEST,
+	C_FIRMWARE_RESPONSE,
+
+	/// Used to report sketch or gateway version to controller. sendSketchInfo()
+	C_VERSION,
+	/// Used to report sketch name to controller. sendSketchInfo()
+	C_NAME,
+	/// Sent from gateway to controller when it's ready for action.
+	C_GATEWAY_READY,
+	/// Present sensors attached to a node. Payload is the ChildSensorType.
+	C_PRESENTATION,
+	/// Request a new id from controller.
+	C_ID,
+	/// Broadcased message from a node to request neighbouring repeaters and gateway to
+	/// report their distance to controller back.
+	C_FIND_PARENT,
+	/// Send in a log message to controllers application log.
+	C_LOG_MESSAGE,
+
+	// Report battery level. sendBatteryLevel()
+	C_BATTERY_LEVEL,
+	/// Request time from controller. requestTime(). Reply in seconds since 1970.
+	C_TIME,
+
+	/// Reebot node command. Requires special bootloader on sensor node.
+	C_RESET,
+
+	/// Activate/deactivate inclusion mode. Used between gateway and controller
+	/// This is not transmitted over-the-air at the moment
+	I_INCLUSION_MODE
+
 } MySensorCommand;
 
-/// Sensor types used for I_PRESENTATION messages.
+/// Sensor types used for C_PRESENTATION messages.
 /// The sensors always report in SI units. See table below for details.
 typedef enum {
 	/// Node itself, used for internal commands and meta data.
@@ -320,43 +351,12 @@ typedef enum {
 } MySensorType;
 
 
-/// Value types used internally by the API. INTERNAL cmd.
-typedef enum {
-	/// Used to report sketch or gateway version to controller. sendSketchInfo()
-	I_VERSION,
-	/// Sent from gateway to controller when it's ready for action.
-	I_GATEWAY_READY,
-	/// Present sensors attached to a node. Payload is the ChildSensorType.
-	I_PRESENTATION,
-	/// Request a new id from controller.
-	I_ID,
-	/// Broadcased message from a node to request neighbouring repeaters and gateway to
-	/// report their distance to controller back.
-	I_FIND_PARENT,
-	/// Send in a log message to controllers application log.
-	I_LOG_MESSAGE,
-
-	// Report battery level. sendBatteryLevel()
-	I_BATTERY_LEVEL,
-	/// Request time from controller. requestTime()
-	I_TIME,
-
-	/// Reebot node command. Requires special bootloader on sensor node.
-	I_RESET,
-	/// Activate/deactivate inclusion mode. Used between gateway and controller.
-	I_INCLUSION_MODE,
-	/// Used to report sketch name to controller. sendSketchInfo()
-	I_NAME,
-} MySensorInternalValueType;
 
 /// ValueTypes used for SET/REQ commands
 typedef enum {
-
-	// Leave some room for future internal value types
-
 	/// A few custom config values available for feching configuration from another sensor
 	/// or controller. Sender and receiver must have a common understanding on what to expect.
-	V_CONFIG1=30,
+	V_CONFIG1,
 	V_CONFIG3,
 	V_CONFIG4,
 	V_CONFIG5,
@@ -510,90 +510,66 @@ typedef enum {
 
 */
 
-/**
- * Network header structures
- */
 
 typedef struct
 {
-	/// 8 bit - Id of last node this message passed
+	/// Id of last node this message passed
 	uint8_t last;
 
-	/// 8 bit - Id of sender node (origin)
+	/// Id of sender node (origin)
 	uint8_t sender;
 
-	// 8 bit - Id of destination node
+	// Id of destination node
 	uint8_t destination;
 
-	/// 1 bit - Request an ack - Indicator that receiver should send an ack back.
-	/// 1 bit - Is ack messsage - Indicator that this is the actual ack message.
-	/// 5 bit - Length of payload
-	/// 1 bit - Reserved for future use
+	///   0: Request an ack - Indicator that receiver should send an ack back.
+	///   1: Is ack messsage - Indicator that this is the actual ack message.
+	/// 2-6: Length of payload
+	///   7: Reserved for future use
 	uint8_t ack_length;
 
-	/// 8 bit - Command type
+	/// Command type
 	uint8_t command;
 } NetworkHeaderDefault;
 
 
-/**
- * Firmware command structures
- */
 
 #define FIRMWARE_BLOCK_SIZE	16
 
-typedef enum {
-	ST_FIRMWARE_CONFIG_REQUEST, ST_FIRMWARE_CONFIG_RESPONSE, ST_FIRMWARE_REQUEST, ST_FIRMWARE_RESPONSE
-} MySensorFirmwareCommandType;
-
+typedef struct
+{
+	uint8_t version;
+} CmdFirmwareConfigRequest;
 
 typedef struct
 {
-} FirmwareConfigRequest;
-
-typedef struct
-{
+	uint8_t version;
 	uint16_t blocks;
 	uint16_t crc;
-} FirmwareConfigResponse;
+} CmdFirmwareConfigResponse;
 
 typedef struct
 {
+	uint8_t version;
 	uint16_t block;
-} FirmwareRequest;
+} CmdFirmwareRequest;
 
 typedef struct
 {
+	uint8_t version;
 	uint16_t block;
 	uint8_t data[FIRMWARE_BLOCK_SIZE];
-} FirmwareResponse;
+} CmdFirmwareResponse;
 
 typedef struct {
-	uint8_t type;
-	uint8_t version;
-
-	union {
-		FirmwareConfigRequest configRequest;
-		FirmwareConfigResponse configResponse;
-		FirmwareRequest request;
-		FirmwareResponse response;
-    }  __attribute__((packed));;
-} CmdFirmware;
-
-
-
-/**
- * Req/set command structure
- */
-typedef struct {
-	/// 3 bit - Payload data type (MySensorPayloadDataType)
-	/// 5 bit - Reserved
+	/// 0-2: Payload data type (MySensorPayloadDataType)
+	/// 3-7: Reserved
 	uint8_t ptype;
 
-	/// 8 bit - Id of sensor that this message concerns.
+	/// Id of sensor that this message concerns.
 	uint8_t sensor;
 
-	/// 8-bit. MySensorVarValueType. See above.
+	/// MySensorVarValueType. See above.
 	uint8_t type;
 
 	/// Each message can transfer a payload. We add one extra byte for string
@@ -613,26 +589,42 @@ typedef struct {
 	} __attribute__((packed));
 } CmdVar;
 
-
-/**
- * Internal command structure
- */
 typedef struct {
-	/// 8 bit - MySensorInternalValueType. See above.
-	uint8_t type;
+	MySensorType type;
+} CmdPresentation;
 
-	/// Internal payload
-	union {
-		uint8_t bValue;
-		unsigned long ulValue;
-		long lValue;
-		unsigned int uiValue;
-		int iValue;
-		char data[MAX_PAYLOAD + 1];
-	} __attribute__((packed));
-} CmdInternal;
+typedef struct {
+	uint8_t version[MAX_PAYLOAD];
+} CmdVersionReport;
 
+typedef struct {
+	uint8_t name[MAX_PAYLOAD];
+} CmdNameReport;
 
+typedef struct {
+	uint16_t requestIdentifier;
+} CmdIdRequest;
+
+typedef struct {
+	uint8_t newId;
+	uint16_t requestIdentifier;
+} CmdIdResponse;
+
+typedef struct {
+	uint8_t distance;
+} CmdFindParentResponse;
+
+typedef struct {
+	uint8_t message[MAX_PAYLOAD];
+} CmdLogMessageReport;
+
+typedef struct {
+	uint8_t level;
+} CmdBatteryLevelReport;
+
+typedef struct {
+	long time;
+} CmdTimeResponse;
 
 
 #ifdef __cplusplus
@@ -692,12 +684,23 @@ struct
 #ifdef MYSENSORS_RF_NRF24
 	NetworkHeaderDefault header;
 #endif
-	/// Message payload
+	/// Message command payloads
 	union {
 		CmdVar var;
-		CmdInternal internal;
-		CmdFirmware firmware;
-	};
+		CmdFirmwareConfigRequest firmawareConfigRequest;
+		CmdFirmwareConfigResponse firmawareConfigResponse;
+		CmdFirmwareRequest firmwareRequest;
+		CmdFirmwareResponse firmawareResponse;
+		CmdPresentation presentation;
+		CmdVersionReport versonReport;
+		CmdNameReport nameReport;
+		CmdIdRequest idRequest;
+		CmdIdResponse idResponse;
+		CmdFindParentResponse findParentResponse;
+		CmdLogMessageReport logMessageReport;
+		CmdBatteryLevelReport batteryLevelReport;
+		CmdTimeResponse timeResponse;
+	}  __attribute__((packed));
 
 #ifdef __cplusplus
 } __attribute__((packed));
