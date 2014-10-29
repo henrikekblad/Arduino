@@ -88,7 +88,7 @@ class MySensor
 	* @param parentNodeId Use this to force node to always communicate with a certain parent node. Default is AUTO which means node automatically tries to find a parent.
 	*/
 
-	void begin(void (* msgCallback)(const MyMessage &)=NULL, uint8_t nodeId=AUTO, boolean repeaterMode=false, uint8_t parentNodeId=AUTO);
+	void begin(void (* msgCallback)(const MyMessage &)=NULL, uint8_t nodeId=AUTO, bool repeaterMode=false, uint8_t parentNodeId=AUTO);
 
 	/**
 	 * Return the nodes nodeId.
@@ -123,7 +123,7 @@ class MySensor
 	*/
 	bool send(MyMessage &msg, bool ack=false);
 
-	boolean sendRoute(MyMessage &message);
+	bool sendRoute(MyMessage &message);
 
 	/**
 	 * Send this nodes battery level to gateway.
@@ -156,7 +156,7 @@ class MySensor
 	* Returns true if there is a message addressed for this node just was received.
 	* Use callback to handle incoming messages.
 	*/
-	boolean process();
+	bool process();
 
 	/**
 	 * Returns the most recent node configuration received from controller
@@ -217,6 +217,18 @@ class MySensor
 	 * @return Interrupt number wake up was triggered by pin change and negative if timer woke it up.
 	 */
 	int8_t sleep(uint8_t interrupt1, uint8_t mode1, uint8_t interrupt2, uint8_t mode2, unsigned long ms=0);
+
+
+
+
+	/**
+	 *
+	 */
+
+
+
+
+
 
 #ifdef DEBUG
 	void debugPrint(const char *fmt, ... );
