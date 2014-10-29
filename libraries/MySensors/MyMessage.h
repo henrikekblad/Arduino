@@ -20,299 +20,337 @@
 
 #define PROTOCOL_VERSION 3
 #define MAX_MESSAGE_LENGTH 32
-#define NETWORK_HEADER_SIZE 7									// SETt/REQ command header size
+#define NETWORK_HEADER_SIZE 7									// SET/REQ command header size
 #define MAX_PAYLOAD (MAX_MESSAGE_LENGTH - NETWORK_HEADER_SIZE)	// Max payload for SET/REQ commands
 
-/// Message types
+
+// Some help defines to make sketch code more readablein sketches
+#define ARMED 1
+#define DISARMED 0
+#define ARM 1
+#define DISARM 0
+#define ON 1
+#define OFF 0
+#define TRIPPED 1
+#define UNTRIPPED 0
+#define UP 1
+#define DOWN 0
+#define LOCKED 1
+#define UNLOCKED 0
+#define LOCK 1
+#define UNLOCK 0
+
+
+/// Command types
 typedef enum {
-	/// Push data or comands to sensor or controller
-	C_SET,
-	/// Request data from sensor or controller
-	C_REQ,
+	/// Node command sent to controller when sketch calls setup()
+	CMD_NODE,
 
 	/// Firmware OTA transmission commands.
-	C_FIRMWARE_CONFIG_REQUEST,
-	C_FIRMWARE_CONFIG_RESPONSE,
-	C_FIRMWARE_REQUEST,
-	C_FIRMWARE_RESPONSE,
+	CMD_FIRMWARE_CONFIG_REQUEST=10,
+	CMD_FIRMWARE_CONFIG_RESPONSE,
+	CMD_FIRMWARE_REQUEST,
+	CMD_FIRMWARE_RESPONSE,
 
 	/// Used to report sketch or gateway version to controller. sendSketchInfo()
-	C_VERSION,
+	CMD_VERSION,
 	/// Used to report sketch name to controller. sendSketchInfo()
-	C_NAME,
+	CMD_NAME,
 	/// Sent from gateway to controller when it's ready for action.
-	C_GATEWAY_READY,
-	/// Present sensors attached to a node. Payload is the ChildSensorType.
-	C_PRESENTATION,
+	CMD_GATEWAY_READY,
+	/// Present devices attached to a node. Payload is the ChildSensorType.
+	CMD_PRESENTATION,
 	/// Request a new id from controller.
-	C_ID,
+	CMD_ID,
 	/// Broadcased message from a node to request neighbouring repeaters and gateway to
 	/// report their distance to controller back.
-	C_FIND_PARENT,
+	CMD_FIND_PARENT,
 	/// Send in a log message to controllers application log.
-	C_LOG_MESSAGE,
+	CMD_LOG_MESSAGE,
 
 	// Report battery level. sendBatteryLevel()
-	C_BATTERY_LEVEL,
+	CMD_BATTERY_LEVEL,
 	/// Request time from controller. requestTime(). Reply in seconds since 1970.
-	C_TIME,
+	CMD_TIME,
 
-	/// Reebot node command. Requires special bootloader on sensor node.
-	C_RESET,
+	/// Reebot node command. Requires special bootloader on the arduino.
+	CMD_RESET,
 
 	/// Activate/deactivate inclusion mode. Used between gateway and controller
-	/// This is not transmitted over-the-air at the moment
-	I_INCLUSION_MODE
+	CMD_INCLUSION_MODE,
 
-} MySensorCommand;
+	///
+	/// Below follows device related commands
+	///
 
-/// Sensor types used for C_PRESENTATION messages.
-/// The sensors always report in SI units. See table below for details.
+	/// Send RGB(W) value for led light
+	DEV_RGB,
+	DEV_RGBW,
+
+	/// Scene command (turns on/off a scene on controller)
+	DEV_SCENE,
+
+	/// Send a binary state commands.
+	DEV_TRIPPED,
+	DEV_ARMED,
+	DEV_STATUS,
+	DEV_LOCKED,
+
+	/// Send watt and kwh
+	DEV_POWER,
+
+	// Send a percentage value for things like window cover position, dimmable light and uncalibrated light levels
+	DEV_PERCENTAGE,
+
+	// Send a level value from or to a device.
+	DEV_LEVEL,
+
+	// Send or request config parameters
+	DEV_CONFIG,
+	// Send or request device variables
+	DEV_VAR,
+
+	// Stop command which can interrupt motion of blinds or window cover
+	DEV_STOP,
+
+	// Ackumelated value for sensor e.g. rain, water meter
+	DEV_ACCUMULATED,
+
+	// Rate values e.g. rain
+	DEV_RATE,
+
+	// Set mode for the device (different meaning for each device)
+	DEV_MODE,
+
+	// Angle report (e.g. compass, wind)
+	DEV_ANGLE,
+
+	// Send or received IR command
+	DEV_IR_SEND,
+	DEV_IR_RECEIVED
+
+};
+typedef uint8_t MySensorCommand;
+
+
+
+/*
+
+struct DoorSensor : BinaryCommand, SecurityCommand { };
+
+struct WindowSensor : BinaryCommand, SecurityCommand { };
+
+struct MotionSensor : BinaryCommand, SecurityCommand { };
+*/
+
+
+/**
+ * The devices always report their data in SI units.
+ * All supported commands is listed per device
+ * CmdSensorVar and CmdSensorConfig is supported by all device types.
+ *
+ * (*) Means that sensor has different modes. Binary/Normal, Calibrated/Uncalibrated.
+ * These modes is sent in with the presenttion message.
+ * Binary sensors acts as security sensors and send in a tripped value when
+ * some predefined criteria is meet.
+ * Commands marked (B) is used in binary mode and (N) in normal mode
+ * Commands makred (C) can send calibrated or (U) uncalibrated values.
+ *
+ */
 typedef enum {
-	/// Node itself, used for internal commands and meta data.
-	/// See I_xxx value types below.
-	S_NODE,
-
 	/// Door sensor
-	/// V_ARMED - 1 = Armed, 0 = Bypassed
-	/// V_STATUS - 1 = Tripped (open), 0 = Untripped (closed=
+	/// CmdSensorTripped
+	/// CmdSensorArmed
 	S_DOOR,
 
 	/// Window sensor
-	/// V_ARMED - 1 = Armed, 0 = Bypassed
-	/// V_STATUS - 1 = Tripped (open), 0 = Untripped (closed)
+	/// CmdSensorTripped
+	/// CmdSensorArmed
 	S_WINDOW,
 
 	/// Motion sensor
-	/// V_ARMED - 1 = Armed, 0 = Bypassed
-	/// V_STATUS - 1 = Tripped (motion detected), 0 = Untripped
+	/// CmdSensorTripped
+	/// CmdSensorArmed
 	S_MOTION,
 
 	/// Smoke sensor
-	/// V_ARMED - 1 = Armed, 0 = Bypassed
-	/// V_STATUS - 1 = Tripped (fire), 0 = Untripped
+	/// CmdSensorTripped
+	/// CmdSensorArmed
 	S_SMOKE,
 
-	/// Light (or other) on/off actuator
-	/// V_STATUS - 1 - turn on, 0 = turn off
-	/// V_WATT - Current power consumption in Watt <int>
-	/// V_WATT_MAX - Max watt value
-	/// V_WATT_MIN - Min watt value
-	/// V_WATT_AVERAGE - Min watt value
-	/// V_ACCUMULATED - The accumulated number of kWh <int or float>
-	S_BINARY,
+	/// Water leak sensor
+	/// CmdSensorTripped
+	/// CmdSensorArmed
+	S_WATER_LEAK,
+
+	/// Binary on/off light
+	/// CmdSensorState
+	/// CmdSensorPower
+	S_LIGHT,
+
+	/// Binary switch sensor
+	/// CmdSensorState
+	S_BINARY_SWITCH,
+
+	/// Rotary switch sensor. E.g. rotary encoder which can be turned or clicked
+	/// CmdSensorTripped - Tripped value is send when clicking encoder (when supported)
+	/// CmdSensorLevel
+	S_ROTARY_ENCODER_SENSOR,
+
+	/// Rotary potentiometer sensor. This sensor has end stops.
+	/// CmdSensorPercentage - Sketch recalculate potentiometer value to a number between 0-100
+	S_POTENTIOMETER_SENSOR,
+
+	/// Controllable acutators that not match the light device
+	/// CmdSensorState
+	S_SWITCH,
 
 	/// Dimmable actuator
-	/// V_STATUS - 1 - turn on, 0 = turn off
-	/// V_PERCENTAGE - Dimmer level 0-100
-	/// V_WATT - Current power consumption in Watt <int>
-	/// V_WATT_MAX - Max watt value
-	/// V_WATT_MIN - Min watt value
-	/// V_WATT_AVERAGE - Min watt value
-	/// V_ACCUMULATED - The accumulated number of kWh <int or float>
+	/// CmdSensorState
+	/// CmdSensorPercentage
+	/// CmdSensorPower
 	S_DIMMABLE,
 
 	/// RGB Light (with red, green, blue component)
-	/// V_STATUS - 1 - turn on all components, 0 = turn off all components
-	/// V_R_LEVEL - Red component 0-255 <int>
-	/// V_G_LEVEL - Green component 0-255 <int>
-	/// V_B_LEVEL - Blue component 0-255 <int>
-	/// V_WATT - Watt <int>
-	/// V_WATT_MAX - Max watt value
-	/// V_WATT_MIN - Min watt value
-	/// V_WATT_AVERAGE - Min watt value
-	/// V_ACCUMULATED - The accumulated number of kWh <int or float>
+	/// CmdSensorState
+	/// CmdSensorRGB
+	/// CmdSensorPower
 	S_RGB,
 
 	/// RGBW Light (with red, green, blue white component)
-	/// V_STATUS - 1 - turn on all components, 0 = turn off all components
-	/// V_R_LEVEL - Red component 0-255 <int>
-	/// V_G_LEVEL - Green component 0-255 <int>
-	/// V_B_LEVEL - Blue component 0-255 <int>
-	/// V_W_LEVEL - White component 0-255 <int>
-	/// V_WATT - Watt <int>
-	/// V_WATT_MAX - Max watt value
-	/// V_WATT_MIN - Min watt value
-	/// V_WATT_AVERAGE - Min watt value
-	/// V_ACCUMULATED - The accumulated number of kWh <int or float>
+	/// CmdSensorState
+	/// CmdSensorRGBW
+	/// CmdSensorPower
 	S_RGBW,
 
 	/// Window covers or shades
-	/// V_STATUS - 1 - open (full up), 0 = close (full down)
-	/// V_PERCENTAGE - Open cover 0-100% <int>
-	/// V_STOP - stop blinds in the middle of motion.
+	/// CmdSensorState - 0 close, 1 open
+	/// CmdSensorPercentage - 0 closed - 100 fully open
+	/// CmdSensorStop - stops blinds or window cover in the middle of motion.
 	S_WINDOW_COVER,
 
-	/// Temperature sensor
-	/// V_LEVEL - Current temperature level in degrees celsius <int or float>
-	/// V_LEVEL_MAX - Max temperature level
-	/// V_LEVEL_MIN - Min temperature level
-	/// V_LEVEL_AVERAGE - Average temperature level
+	/// Temperature sensor (*)
+	/// CmdSensorLevel (N) - Current temperature level in degrees celsius <int or float>
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_THERMOMETER,
 
-	/// Humidity sensor
-	/// V_PERCENTAGE - Humidity percentage 0-100% <int or float>
-	/// V_PERCENTAGE_MAX - Max humidity percentage
-	/// V_PERCENTAGE_MIN - Min humidity percentage
-	/// V_PERCENTAGE_AVERAGE - Average humidity percentage
+	/// Humidity sensor (*)
+	/// CmdSensorPercentage (N)
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_HUMIDITY,
 
-	/// Barometer sensor (Pressure)
-	/// V_LEVEL - Pressure level in hPa
-	/// V_MODE - Whether forecast. One of 0="stable", 1="sunny", 2="cloudy", 3="unstable", 4="thunderstorm" or 5="unknown"
-	/// V_LEVEL_MAX - Max pressure level
-	/// V_LEVEL_MIN - Min pressure level
-	/// V_LEVEL_AVERAGE - Average pressure level
+	/// Barometer sensor or Pressure sensor (*)
+	/// CmdSensorLevel (N) - Pressure level in hPa
+	/// CmdSensorMode (N) - Whether forecast. One of 0="stable", 1="sunny", 2="cloudy", 3="unstable", 4="thunderstorm" or 5="unknown"
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_BAROMETER,
 
-	/// Wind sensor
-	/// V_LEVEL - Wind level in m/s (average wind speed during last report period)
-	/// V_LEVEL_MIN - Min wind level
-	/// V_LEVEL_MAX - Max wind level (gust)
-	/// V_LEVEL_AVERAGE - Average wind level-
-	/// V_ANGLE - degrees clockwise from true north <int>
+	/// Wind sensor (*)
+	/// CmdSensorLevel (N) - Wind level in m/s (average wind speed during last report period)
+	/// CmdSensorAngle (N) - degrees clockwise from true north <int>
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_WIND,
 
-	/// Rain sensor
-	/// V_STATUS - Current rain status. 1=raining, 0=not raining.
-	/// V_ACCUMULATED - Accumulated rain in mm
-	/// V_RATE - Rain rate in mm/h
-	/// V_RATE_MAX - Max rain rate
-	/// V_RATE_MIN - Min rain rate
-	/// V_RATE_AVERAGE - Average rain rate
+	/// Rain sensor (*)
+	/// CmdSensorAccumulated (N) - Accumulated rain in mm
+	/// CmdSensorRate (N) - Rain rate in mm/h
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_RAIN,
 
-	/// UV sensor
-	/// V_LEVEL - Uv Index level (0-12)
-	/// V_LEVEL_MAX - Max uv level
-	/// V_LEVEL_MIN - Min uv level
-	/// V_LEVEL_AVERAGE - Average uv level
+	/// UV sensor (*)
+	/// CmdSensorLevel (N) - Uv Index level (0-12)
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_UV,
 
 	/// Weight sensor
-	/// V_LEVEL - Weight in kg <int, float>
-	/// V_LEVEL_MAX - Max weight level
-	/// V_LEVEL_MIN - Min weight level
-	/// V_LEVEL_AVERAGE - Average weight level
+	/// CmdSensorLevel - Weight in kg <int, float>
 	S_WEIGHT_SCALE,
 
-	/// Power measuring device, like power meters or clamps
-	/// V_WATT - Watt <int>
-	/// V_WATT_MAX - Max watt value
-	/// V_WATT_MIN - Min watt value
-	/// V_WATT_AVERAGE - Min watt value
-	/// V_ACCUMULATED - The accumulated number of kWh <int or float>
-	S_POWER,
+	/// Power measuring sensor (*)
+	/// CmdSensorPower (N)
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
+	S_POWER_METER,
 
 	/// Thermostat (for controlling heater or cooler devices)
-	/// V_STATUS - 1=On, 0=Off. Heater/cooler power switch.
-	/// V_MODE - Heater/AC mode. One of 0="Off", 1="HeatOn", 2="CoolOn", or 3="AutoChangeOver"
-	/// V_LEVEL - Setpoint for ideal temperature in celsius degrees
+	/// CmdSensorState - Turn 1=On, 0=Off heater or cooler power switch.
+	/// CmdSensorMode - Heater/AC mode. One of 0="Off", 1="HeatOn", 2="CoolOn", or 3="AutoChangeOver"
+	/// CmdSensorLevel - Setpoint for ideal temperature in celsius degrees
 	S_THERMOSTAT,
 
-	/// Distance sensor
-	/// V_LEVEL - Distance in meters <int, float>
-	/// V_LEVEL_MAX - Max distance value
-	/// V_LEVEL_MIN - Min distance value
-	/// V_LEVEL_AVERAGE - Average distance value
+	/// Distance sensor (*)
+	/// CmdSensorLevel (N) - Distance in meters <int, float>
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_DISTANCE,
 
-	/// Light sensor
-	/// V_STATUS - Tripped status. Set to 1 when light is detected (binary light sensors).
-	/// V_LEVEL - Light level in lux
-	/// V_LEVEL_MAX - Max lux light level
-	/// V_LEVEL_MIN - Min lux light level
-	/// V_LEVEL_AVERAGE - Average lux light level
+	/// Light sensor (*)
+	/// CmdSensorLevel (N/C) - Light level in lux
+	/// CmdSensorPercentage (N/U) - Uncalibrated light level in percentage 0-100%
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_LIGHT_SENSOR,
 
-	/// Uncalibrated Light sensor
-	/// V_PERCENTAGE - Light level in percentage 0-100% <int, float>
-	/// V_PERCENTAGE_MAX - Max light level %
-	/// V_PERCENTAGE_MIN - Min light level %
-	/// V_PERCENTAGE_AVERAGE - Average light level %
-	S_UNCALIBRATED_LIGHT_SENSOR,
-
-	/// Binary light sensor which triggers at a certain level.
-	/// V_ARMED - 1 = Armed, 0 = Bypassed
-	/// V_STATUS - 1 = Tripped, 0 = Untripped
-	S_BINARY_LIGHT_SENSOR,
-
-	/// Lock device
-	/// V_STATUS - 1=Locked, 0 = Unlocked
-	S_LOCK,
-
-	/// Ir sender or receiver device
-	/// V_IR_RECEIVED - Ir code received
-	/// V_IR_SEND - Ir code to send
-	S_IR,
-
 	/// Water meter
-	/// V_ACCUMULATED - Accumulated water volume in m3 <int, float>
-	/// V_RATE - Flow rate in l/m <int or float>
-	/// V_RATE_MAX - Max flow rate
-	/// V_RATE_MIN - Min flow rate
-	/// V_RATE_AVERAGE - Average flow rate
+	/// CmdSensorAccumulated - Accumulated water volume in m3 <int, float>
+	/// CmdSensorRate - Flow rate in l/m <int or float>
 	S_WATER_METER,
 
-	/// Ph sensor
-	/// V_LEVEL - Ph level using standard pH scale 0-14 <int or float>
-	/// V_LEVEL_MAX - Max ph level
-	/// V_LEVEL_MIN - Min ph level
-	/// V_LEVEL_AVERGE - Average ph level
+	/// Ph sensor (*)
+	/// CmdSensorLevel (N) - Ph level using standard pH scale 0-14 <int or float>
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_PH,
 
 	/// Scene controller device
-	/// V_SCENE_ON - Scene number <int>
-	/// V_SCENE_OFF - Scene number <int>
+	/// CmdSensorScene
 	S_SCENE_CONTROLLER,
 
-	// Sound sensor
-	/// V_LEVEL - Calibrated sound level in db
-	/// V_LEVEL_MAX - Max sound level
-	/// V_LEVEL_MIN - Min sound level
-	/// V_LEVEL_AVERAGE - Average sound level
+	/// Sound sensor (*)
+	/// CmdSensorLevel (N/C) - Calibrated sound level in db
+	/// CmdSensorPercentage (N/U) - Uncalibrated sound level in percentage 0-100%
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_SOUND,
 
-	// Uncalibrated sound sensor
-	/// V_PERCENTAGE - Uncalibrated sound level in percentage 0-100% <int, float>
-	/// V_PERCENTAGE_MAX - Max sound level %
-	/// V_PERCENTAGE_MIN - Min sound level %
-	/// V_PERCENTAGE_AVERAGE - Average sound level %
-	S_UNCALIBRATED_SOUND,
-
-	// Sound sensor which triggers at a certain sound level
-	/// V_STATUS - Tripped status. Set to 1 when sound is detected.
-	/// V_ARMED - Armed status of a security sensor. 1=Armed, 0=Bypassed
-	S_BINARY_SOUND,
-
-	/// Vibration sensor
-	/// V_LEVEL - vibration level in Hertz
-	/// V_LEVEL_MAX - Max vibration level
-	/// V_LEVEL_MIN - Min vibration level
-	/// V_LEVEL_AVERAGE - Average vibration level
+	/// Vibration sensor (*)
+	/// CmdSensorLevel (N) - vibration level in Hertz
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
 	S_VIBRATION,
-
-	/// Vibration sensor which triggers at a certain level
-	/// V_STATUS - Tripped status. Set to 1 when vibration is detected.
-	/// V_ARMED - Armed status of a security sensor. 1=Armed, 0=Bypassed
-	S_BINARY_VIBRATION,
 
 	/// Gyro sensor
 	/// Here we need some kind of value types. Help needed!
 	S_GYRO,
 
 	/// Compass sensor
-	/// V_ANGLE - degrees clockwise from true north <int>
+	/// CmdSensorAngle - degrees clockwise from true north <int>
 	S_COMPASS,
 
-	// Leave some space in numbering here for future sensors
+	/// Lock device
+	/// CmdSensorLocked - 1=Locked/Lock, 0=Unlocked/Unlock
+	S_LOCK,
 
-	/// Some more obscure gas sensors
-	/// V_LEVEL - Gas level in ug/m3
-	/// V_LEVEL_MAX - Max gas level
-	/// V_LEVEL_MIN - Min gas level
-	/// V_LEVEL_AVERAGE - Average gas level
-	S_DUST=80,			// Dust sensor
+	/// IR sender device
+	/// CmdIrSend
+	S_IR_SENDER,
+
+	/// IR receiver device
+	/// CmdIrReceived
+	S_IR_RECEIVER,
+
+	/// A list of more or less common gas sensors  (*)
+	/// CmdSensorLevel (N/C) - Gas level in ug/m3
+	/// CmdSensorPercentage (N/U) - Uncalibrated gas level
+	/// CmdSensorTripped (B)
+	/// CmdSensorArmed (B)
+	S_DUST=100,			// Dust sensor
 	S_CARBON_MONOXIDE, 	// Carbon Monoxide – CO
 	S_CARBON_DIOXIDE, 	// Carbon Dioxide – CO2
 	S_OXYGENE, 			// Oxygen – O2
@@ -344,119 +382,18 @@ typedef enum {
 	S_PM2,				// PM2.5 mass - UG/M3
 	S_PM10,				// PM10 mass - PM10 mass
 
-	/// Used for sensors not fitting any other sensor types.
-	/// If you find yourself using this it might be a candidate for a new sensor type?
+	/// Used for devices not fitting any other sensor types.
+	/// If you find yourself using this it might be a candidate for a new device type?
 	S_CUSTOM=255,
 
-} MySensorType;
-
-
-
-/// ValueTypes used for SET/REQ commands
-typedef enum {
-	/// A few custom config values available for feching configuration from another sensor
-	/// or controller. Sender and receiver must have a common understanding on what to expect.
-	V_CONFIG1,
-	V_CONFIG3,
-	V_CONFIG4,
-	V_CONFIG5,
-
-	/// A few custom variables or sensor data normally used to push information
-	/// to another sensor or controller. Sender and receiver must have a common
-	/// understanding on what to expect.
-	V_VAR1,
-	V_VAR2,
-	V_VAR3,
-	V_VAR4,
-	V_VAR5,
-
-	/// Use this for transmitting custom _binary_ data not covered by above.
-	/// Requires sender/receiver to have a common understanding on the payload content.
-	V_CUSTOM,
-
-	/// Use STATUS for reporting or settings binary values such as a true/false on on/off state.
-	/// 1 - turn on/tripped,... , 0 = turn off/not tripped,...
-	/// See the MySensorType for usage on differend sensor types
-	V_STATUS,
-
-	/// ValueType mainly used by security devices. 1=Armed, 0=Disarmed.
-	V_ARMED,
-
-	/// Sensor or actuator level. E.g weight, light level,
-	V_LEVEL,
-	/// Used to report maximum level value in the node.
-	V_LEVEL_MAX,
-	/// Used to report minimum level value in the node.
-	V_LEVEL_MIN,
-	/// Used to report average level value in the node.
-	V_LEVEL_AVERAGE,
-
-	/// Report or set percentage value. E.g. dimmer level, window cover, humidity, uncalibrated light level.
-	V_PERCENTAGE,
-	/// Used to report maximum percentage from the node.
-	V_PERCENTAGE_MAX,
-	/// Used to report mainimum percentage from the node.
-	V_PERCENTAGE_MIN,
-	/// Used to report average percentage from the node.
-	V_PERCENTAGE_AVERAGE,
-
-	/// Used for accumelated values such as rain(mm) or KWh
-	V_ACCUMULATED,
-	/// Reset accumelated sensor value
-	V_ACCUMULATED_RESET,
-
-	/// Used to report rate value such as rain or water flow rate
-	V_RATE,
-	/// Used to report maximum rate value.
-	V_RATE_MAX,
-	/// Used to report minimum rate value
-	V_RATE_MIN,
-	/// Used to report average rate value
-	V_RATE_AVERAGE,
-
-	/// Used to report current power consuption in Watt
-	V_WATT,
-	/// Used to report maximum watt value.
-	V_WATT_MAX,
-	/// Used to report minimum watt value.
-	V_WATT_MIN,
-	/// Used to report average watt value.
-	V_WATT_AVERAGE,
-
-	/// Used for sensor or actuaor mode. E.g. heater, weather forecast prognosis
-	V_MODE,
-
-	/// Stop command to shut down motion of blinds or windows coverings.
-	V_STOP,
-
-	/// Red component 0-255 for led lightning
-	V_R_LEVEL,
-	/// Green component 0-255 for led lightning
-	V_G_LEVEL,
-	/// Blue component 0-255 for led lightning
-	V_B_LEVEL,
-	// White component 0-255 for led lightning
-	V_W_LEVEL,
-
-	/// Ir code received
-	V_IR_RECEIVED,
-	/// Ir code to send
-	V_IR_SEND,
-
-	/// Scene on command.
-	V_SCENE_ON,
-	/// Schene off command
-	V_SCENE_OFF,
-
-	/// Used for compasses or wind direction. Degrees clockwise from true north
-	V_ANGLE
-
-} MySensorVarValueType;
+};
+typedef uint8_t MySensorDeviceType;
 
 
 typedef enum {
 	P_STRING, P_BYTE, P_INT16, P_UINT16, P_LONG32, P_ULONG32, P_CUSTOM, P_FLOAT32
-} MySensorPayloadDataType;
+};
+typedef uint8_t MySensorPayloadDataType;
 
 
 /*
@@ -524,9 +461,9 @@ typedef struct
 
 	///   0: Request an ack - Indicator that receiver should send an ack back.
 	///   1: Is ack messsage - Indicator that this is the actual ack message.
-	/// 2-6: Length of payload
-	///   7: Reserved for future use
-	uint8_t ack_length;
+	///   2: Indication if this is a request command (e.g. request config from controller or data from other node)
+	/// 3-7: Length of payload
+	uint8_t flags;
 
 	/// Command type
 	uint8_t command;
@@ -561,36 +498,24 @@ typedef struct
 	uint8_t data[FIRMWARE_BLOCK_SIZE];
 } CmdFirmwareResponse;
 
-typedef struct {
-	/// 0-2: Payload data type (MySensorPayloadDataType)
-	/// 3-7: Reserved
-	uint8_t ptype;
-
-	/// Id of sensor that this message concerns.
-	uint8_t sensor;
-
-	/// MySensorVarValueType. See above.
-	uint8_t type;
-
-	/// Each message can transfer a payload. We add one extra byte for string
-	/// terminator \0 to be "printable" this is not transferred OTA
-	/// This union is used to simplify the construction of the binary data types transferred.
-	union {
-		uint8_t bValue;
-		unsigned long ulValue;
-		long lValue;
-		unsigned int uiValue;
-		int iValue;
-		struct { // Float messages
-			float fValue;
-			uint8_t fPrecision;   // Number of decimals when serializing
-		};
-		char data[MAX_PAYLOAD + 1];
-	} __attribute__((packed));
-} CmdVar;
 
 typedef struct {
-	MySensorType type;
+	uint8_t libraryVersion;
+	uint8_t isRepeater;
+} CmdNode;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// The type of device. See table above.
+	MySensorDeviceType type;
+	/// Indicatior if this sensor will report as a security sensor
+	/// in binary mode.
+	/// 0=normal, 1=binary
+	uint8_t binary;
+	/// Indicator if this sensor will report as a calibrated or uncalibrated percentage (where applicable)
+	/// 0=uncalibrated, 1=calibrated
+	uint8_t calibrated;
 } CmdPresentation;
 
 typedef struct {
@@ -623,8 +548,166 @@ typedef struct {
 } CmdBatteryLevelReport;
 
 typedef struct {
-	long time;
+	uint32_t time;
 } CmdTimeResponse;
+
+typedef struct {
+	/// Payload data type
+	MySensorPayloadDataType ptype;
+
+	/// Each message can transfer a payload. We add one extra byte for string
+	/// terminator \0 to be "printable" this is not transferred OTA
+	/// This union is used to simplify the construction of the binary data types transferred.
+	union {
+		uint8_t bValue;
+		uint32_t ulValue;
+		int32_t lValue;
+		uint16_t uiValue;
+		int16_t iValue;
+		struct { // Float messages
+			float fValue;
+			uint8_t fPrecision;   // Number of decimals when serializing
+		};
+		char data[MAX_PAYLOAD + 1];
+	} __attribute__((packed));
+
+
+} MySesnorsDynamicPayload;
+
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+
+	MySesnorsDynamicPayload value;
+} CmdSensorDynamic;
+
+typedef CmdSensorDynamic CmdSensorLevel;
+typedef CmdSensorDynamic CmdSensorAccumulated;
+typedef CmdSensorDynamic CmdSensorRate;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+
+	/// Id of config or var param to set or get
+	uint8_t param;
+
+	/// Payload data type
+	MySensorPayloadDataType ptype;
+
+	/// Payload value
+	MySesnorsDynamicPayload value;
+
+} CmdParamDynamic;
+
+typedef CmdParamDynamic CmdSensorVar;
+typedef CmdParamDynamic CmdSensorConfig;
+
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// Red, Green, Blue and white component value.
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+} CmdSensorRGB;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// Red, Green, Blue and white component value.
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+	uint8_t w;
+} CmdSensorRGBW;
+
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// Scene number 0-255
+	uint8_t scene;
+	/// Status ON(1) or OFF(0)
+	uint8_t status;
+} CmdSensorScene;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// TRIPPED, UNTRIPPED
+	uint8_t status;
+} CmdSensorTripped;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	///  ARMED, DISARMED,
+	uint8_t armed;
+} CmdSensorArmed;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// Status ON, OFF
+	uint8_t status;
+} CmdSensorStatus;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// Status LOCKED, UNLOCKED
+	uint8_t status;
+} CmdSensorLocked;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+} CmdSensorStop;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// The mode this device should run in .
+	uint8_t mode;
+} CmdSensorMode;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// Angle in degrees from true north 0-360 .
+	uint16_t angle;
+} CmdSensorAngle;
+
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// Current watt value
+	uint8_t watt;
+	/// The Accumulated kwh
+	uint8_t kwh;
+} CmdSensorPower;
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// A Pecentage value between 0-100%
+	uint8_t percentage;
+} CmdSensorPercentage;
+
+
+typedef struct {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// For now we have to send predefined ir commands in the node. Just select which code to send or has been received.
+	uint16_t code;
+} CmdIrSend;
+typedef CmdIrSend CmdIrReceived;
+
+
 
 
 #ifdef __cplusplus
@@ -634,7 +717,7 @@ public:
 	// Constructors
 	MyMessage();
 
-	MyMessage(uint8_t sensor, uint8_t type);
+	MyMessage(uint8_t device, uint8_t type);
 
 	char i2h(uint8_t i) const;
 
@@ -660,7 +743,7 @@ public:
 
 	// Setters for building message "on the fly"
 	MyMessage& setType(uint8_t type);
-	MyMessage& setSensor(uint8_t sensor);
+	MyMessage& setDevice(uint8_t device);
 	MyMessage& setDestination(uint8_t destination);
 
 	// Setters for payload
@@ -672,6 +755,8 @@ public:
 	MyMessage& set(long value);
 	MyMessage& set(unsigned int value);
 	MyMessage& set(int value);
+
+
 
 #else
 
@@ -686,11 +771,15 @@ struct
 #endif
 	/// Message command payloads
 	union {
-		CmdVar var;
+
+		// Firmaware related conmmands
 		CmdFirmwareConfigRequest firmawareConfigRequest;
 		CmdFirmwareConfigResponse firmawareConfigResponse;
 		CmdFirmwareRequest firmwareRequest;
 		CmdFirmwareResponse firmawareResponse;
+
+		// Internal commands used by API
+		CmdNode node;
 		CmdPresentation presentation;
 		CmdVersionReport versonReport;
 		CmdNameReport nameReport;
@@ -700,6 +789,27 @@ struct
 		CmdLogMessageReport logMessageReport;
 		CmdBatteryLevelReport batteryLevelReport;
 		CmdTimeResponse timeResponse;
+
+		// Device related commands
+		CmdSensorRGB rgb;
+		CmdSensorRGBW rgbw;
+		CmdSensorScene scene;
+		CmdSensorTripped tripped;
+		CmdSensorArmed armed;
+		CmdSensorStatus status;
+		CmdSensorLocked locked;
+		CmdSensorPower power;
+		CmdSensorPercentage percentage;
+		CmdSensorLevel level;
+		CmdSensorAccumulated accumulated;
+		CmdSensorVar var;
+		CmdSensorConfig config;
+		CmdSensorStop stop;
+		CmdSensorRate rate;
+		CmdSensorMode mode;
+		CmdSensorAngle angle;
+		CmdIrReceived receivedIr;
+		CmdIrSend sendIr;
 	}  __attribute__((packed));
 
 #ifdef __cplusplus
