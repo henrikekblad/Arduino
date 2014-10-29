@@ -84,50 +84,50 @@ typedef enum {
 	///
 
 	/// Send RGB(W) value for led light
-	DEV_RGB,
-	DEV_RGBW,
+	CMD_DEV_RGB,
+	CMD_DEV_RGBW,
 
 	/// Scene command (turns on/off a scene on controller)
-	DEV_SCENE,
+	CMD_DEV_SCENE,
 
 	/// Send a binary state commands.
-	DEV_TRIPPED,
-	DEV_ARMED,
-	DEV_STATUS,
-	DEV_LOCKED,
+	CMD_DEV_TRIPPED,
+	CMD_DEV_ARMED,
+	CMD_DEV_STATUS,
+	CMD_DEV_LOCKED,
 
 	/// Send watt and kwh
-	DEV_POWER,
+	CMD_DEV_POWER,
 
 	// Send a percentage value for things like window cover position, dimmable light and uncalibrated light levels
-	DEV_PERCENTAGE,
+	CMD_DEV_PERCENTAGE,
 
 	// Send a level value from or to a device.
-	DEV_LEVEL,
+	CMD_DEV_LEVEL,
 
 	// Send or request config parameters
-	DEV_CONFIG,
+	CMD_DEV_CONFIG,
 	// Send or request device variables
-	DEV_VAR,
+	CMD_DEV_VAR,
 
 	// Stop command which can interrupt motion of blinds or window cover
-	DEV_STOP,
+	CMD_DEV_STOP,
 
 	// Ackumelated value for sensor e.g. rain, water meter
-	DEV_ACCUMULATED,
+	CMD_DEV_ACCUMULATED,
 
 	// Rate values e.g. rain
-	DEV_RATE,
+	CMD_DEV_RATE,
 
 	// Set mode for the device (different meaning for each device)
-	DEV_MODE,
+	CMD_DEV_MODE,
 
 	// Angle report (e.g. compass, wind)
-	DEV_ANGLE,
+	CMD_DEV_ANGLE,
 
 	// Send or received IR command
-	DEV_IR_SEND,
-	DEV_IR_RECEIVED
+	CMD_DEV_IR_SEND,
+	CMD_DEV_IR_RECEIVED
 
 };
 typedef uint8_t MySensorCommand;
@@ -151,230 +151,230 @@ typedef enum {
 	/// Door sensor
 	/// CmdDeviceTripped
 	/// CmdDeviceArmed
-	S_DOOR,
+	DEV_DOOR,
 
 	/// Window sensor
 	/// CmdDeviceTripped
 	/// CmdDeviceArmed
-	S_WINDOW,
+	DEV_WINDOW,
 
 	/// Motion sensor
 	/// CmdDeviceTripped
 	/// CmdDeviceArmed
-	S_MOTION,
+	DEV_MOTION,
 
 	/// Smoke sensor
 	/// CmdDeviceTripped
 	/// CmdDeviceArmed
-	S_SMOKE,
+	DEV_SMOKE,
 
 	/// Water leak sensor
 	/// CmdDeviceTripped
 	/// CmdDeviceArmed
-	S_WATER_LEAK,
+	DEV_WATER_LEAK,
 
 	/// Binary on/off light
 	/// CmdDeviceState
 	/// CmdDevicePower
-	S_LIGHT,
+	DEV_LIGHT,
 
 	/// Binary switch sensor
 	/// CmdDeviceState
-	S_BINARY_SWITCH,
+	DEV_BINARY_SWITCH,
 
 	/// Rotary switch sensor. E.g. rotary encoder which can be turned or clicked
 	/// CmdDeviceTripped - Tripped value is send when clicking encoder (when supported)
 	/// CmdDeviceLevel
-	S_ROTARY_ENCODER_SENSOR,
+	DEV_ROTARY_ENCODER_SENSOR,
 
 	/// Rotary potentiometer sensor. This sensor has end stops.
 	/// CmdDevicePercentage - Sketch recalculate potentiometer value to a number between 0-100
-	S_POTENTIOMETER_SENSOR,
+	DEV_POTENTIOMETER_SENSOR,
 
 	/// Controllable acutators that not match the light device
 	/// CmdDeviceState
-	S_SWITCH,
+	DEV_SWITCH,
 
 	/// Dimmable actuator
 	/// CmdDeviceState
 	/// CmdDevicePercentage
 	/// CmdDevicePower
-	S_DIMMABLE,
+	DEV_DIMMABLE,
 
 	/// RGB Light (with red, green, blue component)
 	/// CmdDeviceState
 	/// CmdDeviceRGB
 	/// CmdDevicePower
-	S_RGB,
+	DEV_RGB,
 
 	/// RGBW Light (with red, green, blue white component)
 	/// CmdDeviceState
 	/// CmdDeviceRGBW
 	/// CmdDevicePower
-	S_RGBW,
+	DEV_RGBW,
 
 	/// Window covers or shades
 	/// CmdDeviceState - 0 close, 1 open
 	/// CmdDevicePercentage - 0 closed - 100 fully open
 	/// CmdDeviceStop - stops blinds or window cover in the middle of motion.
-	S_WINDOW_COVER,
+	DEV_WINDOW_COVER,
 
 	/// Temperature sensor (*)
 	/// CmdDeviceLevel (N) - Current temperature level in degrees celsius <int or float>
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_THERMOMETER,
+	DEV_THERMOMETER,
 
 	/// Humidity sensor (*)
 	/// CmdDevicePercentage (N)
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_HUMIDITY,
+	DEV_HUMIDITY,
 
 	/// Barometer sensor or Pressure sensor (*)
 	/// CmdDeviceLevel (N) - Pressure level in hPa
 	/// CmdDeviceMode (N) - Whether forecast. One of 0="stable", 1="sunny", 2="cloudy", 3="unstable", 4="thunderstorm" or 5="unknown"
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_BAROMETER,
+	DEV_BAROMETER,
 
 	/// Wind sensor (*)
 	/// CmdDeviceLevel (N) - Wind level in m/s (average wind speed during last report period)
 	/// CmdDeviceAngle (N) - degrees clockwise from true north <int>
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_WIND,
+	DEV_WIND,
 
 	/// Rain sensor (*)
 	/// CmdDeviceAccumulated (N) - Accumulated rain in mm
 	/// CmdDeviceRate (N) - Rain rate in mm/h
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_RAIN,
+	DEV_RAIN,
 
 	/// UV sensor (*)
 	/// CmdDeviceLevel (N) - Uv Index level (0-12)
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_UV,
+	DEV_UV,
 
 	/// Weight sensor
 	/// CmdDeviceLevel - Weight in kg <int, float>
-	S_WEIGHT_SCALE,
+	DEV_WEIGHT_SCALE,
 
 	/// Power measuring sensor (*)
 	/// CmdDevicePower (N)
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_POWER_METER,
+	DEV_POWER_METER,
 
 	/// Thermostat (for controlling heater or cooler devices)
 	/// CmdDeviceState - Turn 1=On, 0=Off heater or cooler power switch.
 	/// CmdDeviceMode - Heater/AC mode. One of 0="Off", 1="HeatOn", 2="CoolOn", or 3="AutoChangeOver"
 	/// CmdDeviceLevel - Setpoint for ideal temperature in celsius degrees
-	S_THERMOSTAT,
+	DEV_THERMOSTAT,
 
 	/// Distance sensor (*)
 	/// CmdDeviceLevel (N) - Distance in meters <int, float>
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_DISTANCE,
+	DEV_DISTANCE,
 
 	/// Light sensor (*)
 	/// CmdDeviceLevel (N/C) - Light level in lux
 	/// CmdDevicePercentage (N/U) - Uncalibrated light level in percentage 0-100%
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_LIGHT_SENSOR,
+	DEV_LIGHT_SENSOR,
 
 	/// Water meter
 	/// CmdDeviceAccumulated - Accumulated water volume in m3 <int, float>
 	/// CmdDeviceRate - Flow rate in l/m <int or float>
-	S_WATER_METER,
+	DEV_WATER_METER,
 
 	/// Ph sensor (*)
 	/// CmdDeviceLevel (N) - Ph level using standard pH scale 0-14 <int or float>
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_PH,
+	DEV_PH,
 
 	/// Scene controller device
 	/// CmdDeviceScene
-	S_SCENE_CONTROLLER,
+	DEV_SCENE_CONTROLLER,
 
 	/// Sound sensor (*)
 	/// CmdDeviceLevel (N/C) - Calibrated sound level in db
 	/// CmdDevicePercentage (N/U) - Uncalibrated sound level in percentage 0-100%
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_SOUND,
+	DEV_SOUND,
 
 	/// Vibration sensor (*)
 	/// CmdDeviceLevel (N) - vibration level in Hertz
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_VIBRATION,
+	DEV_VIBRATION,
 
 	/// Gyro sensor
 	/// Here we need some kind of value types. Help needed!
-	S_GYRO,
+	DEV_GYRO,
 
 	/// Compass sensor
 	/// CmdDeviceAngle - degrees clockwise from true north <int>
-	S_COMPASS,
+	DEV_COMPASS,
 
 	/// Lock device
 	/// CmdDeviceLocked - 1=Locked/Lock, 0=Unlocked/Unlock
-	S_LOCK,
+	DEV_LOCK,
 
 	/// IR sender device
 	/// CmdIrSend
-	S_IR_SENDER,
+	DEV_IR_SENDER,
 
 	/// IR receiver device
 	/// CmdIrReceived
-	S_IR_RECEIVER,
+	DEV_IR_RECEIVER,
 
 	/// A list of more or less common gas sensors  (*)
 	/// CmdDeviceLevel (N/C) - Gas level in ug/m3
 	/// CmdDevicePercentage (N/U) - Uncalibrated gas level
 	/// CmdDeviceTripped (B)
 	/// CmdDeviceArmed (B)
-	S_DUST=100,			// Dust sensor
-	S_CARBON_MONOXIDE, 	// Carbon Monoxide – CO
-	S_CARBON_DIOXIDE, 	// Carbon Dioxide – CO2
-	S_OXYGENE, 			// Oxygen – O2
-	S_METHANE,			// Methane – CH4
-	S_HYDROGEN,			// Hydrogen – H2
-	S_AMMONIA,			// Ammonia – NH3
-	S_ISOBUTANE, 		// Isobutane – C4H10
-	S_ETHANOL,			// Ethanol – CH3CH2OH (aka C2H5OH or C2H60)
-	S_ETHANOL_50,		// Ethanol CO2H50H
-	S_TOULENE,			// Toluene – C6H5CH3
-	S_HYDROGEN_SULFIDE, // Hydrogen Sulfide – H2S
-	S_NITROGEN_DIOXIDE, // Nitrogen Dioxide – NO2
-	S_OZONE,			// Ozone – O3
-	S_HYDROCARBON,		// Hydrocarbons – VOC
-	S_CHLORINE,			// Chlorine CL2
-	S_AMMONIUM,			// Ammonium NH4
-	S_METHYL,			// Methyl CH3
-	S_ACETONE, 			// Acetone CH3_2CO
-	S_LPG,				// LPG (both C3H8 C4H10)
-	S_NITRIC_OXIDE,		// Nitric oxide NO
-	S_NITROGENE_OXIDES,	// Nitrogen oxides NOX
-	S_NO3,				// NO3 ion (nitrate, not adjusted for ammonium ion) UG/M3
-	S_S04,				// SO4 ion, sulfate, not adjusted for ammonium ion, UG/M3
-	S_S02,				// SO2 sulfur dioxide, ppb
-	S_EC,				// EC (elemental carbon) – PM2.5 UG/M3
-	S_ORGANIC_CARBON,	// OC (organic carbon, not adjusted for oxygen and hydrogen) – PM2.5 UG/M3
-	S_BLACK_CARBON, 	// BC (black carbon at 880 nm) UG/M3
-	S_UV_AETH,			// UV-AETH (second channel of Aethalometer at 370 nm) UG/M3
-	S_PM2,				// PM2.5 mass - UG/M3
-	S_PM10,				// PM10 mass - PM10 mass
+	DEV_DUST=100,			// Dust sensor
+	DEV_CARBON_MONOXIDE, 	// Carbon Monoxide – CO
+	DEV_CARBON_DIOXIDE, 	// Carbon Dioxide – CO2
+	DEV_OXYGENE, 			// Oxygen – O2
+	DEV_METHANE,			// Methane – CH4
+	DEV_HYDROGEN,			// Hydrogen – H2
+	DEV_AMMONIA,			// Ammonia – NH3
+	DEV_ISOBUTANE, 		// Isobutane – C4H10
+	DEV_ETHANOL,			// Ethanol – CH3CH2OH (aka C2H5OH or C2H60)
+	DEV_ETHANOL_50,		// Ethanol CO2H50H
+	DEV_TOULENE,			// Toluene – C6H5CH3
+	DEV_HYDROGEN_SULFIDE, // Hydrogen Sulfide – H2S
+	DEV_NITROGEN_DIOXIDE, // Nitrogen Dioxide – NO2
+	DEV_OZONE,			// Ozone – O3
+	DEV_HYDROCARBON,		// Hydrocarbons – VOC
+	DEV_CHLORINE,			// Chlorine CL2
+	DEV_AMMONIUM,			// Ammonium NH4
+	DEV_METHYL,			// Methyl CH3
+	DEV_ACETONE, 			// Acetone CH3_2CO
+	DEV_LPG,				// LPG (both C3H8 C4H10)
+	DEV_NITRIC_OXIDE,		// Nitric oxide NO
+	DEV_NITROGENE_OXIDES,	// Nitrogen oxides NOX
+	DEV_NO3,				// NO3 ion (nitrate, not adjusted for ammonium ion) UG/M3
+	DEV_S04,				// SO4 ion, sulfate, not adjusted for ammonium ion, UG/M3
+	DEV_S02,				// SO2 sulfur dioxide, ppb
+	DEV_EC,				// EC (elemental carbon) – PM2.5 UG/M3
+	DEV_ORGANIC_CARBON,	// OC (organic carbon, not adjusted for oxygen and hydrogen) – PM2.5 UG/M3
+	DEV_BLACK_CARBON, 	// BC (black carbon at 880 nm) UG/M3
+	DEV_UV_AETH,			// UV-AETH (second channel of Aethalometer at 370 nm) UG/M3
+	DEV_PM2,				// PM2.5 mass - UG/M3
+	DEV_PM10,				// PM10 mass - PM10 mass
 
 	/// Used for devices not fitting any other sensor types.
 	/// If you find yourself using this it might be a candidate for a new device type?
-	S_CUSTOM=255,
+	DEV_CUSTOM=255,
 
 };
 typedef uint8_t MySensorDeviceType;
