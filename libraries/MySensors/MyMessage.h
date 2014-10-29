@@ -137,7 +137,7 @@ typedef uint8_t MySensorCommand;
 /**
  * The devices always report their data in SI units.
  * All supported commands is listed per device
- * CmdSensorVar and CmdSensorConfig is supported by all device types.
+ * CmdDeviceVar and CmdDeviceConfig is supported by all device types.
  *
  * (*) Means that sensor has different modes. Binary/Normal, Calibrated/Uncalibrated.
  * These modes is sent in with the presenttion message.
@@ -149,170 +149,170 @@ typedef uint8_t MySensorCommand;
  */
 typedef enum {
 	/// Door sensor
-	/// CmdSensorTripped
-	/// CmdSensorArmed
+	/// CmdDeviceTripped
+	/// CmdDeviceArmed
 	S_DOOR,
 
 	/// Window sensor
-	/// CmdSensorTripped
-	/// CmdSensorArmed
+	/// CmdDeviceTripped
+	/// CmdDeviceArmed
 	S_WINDOW,
 
 	/// Motion sensor
-	/// CmdSensorTripped
-	/// CmdSensorArmed
+	/// CmdDeviceTripped
+	/// CmdDeviceArmed
 	S_MOTION,
 
 	/// Smoke sensor
-	/// CmdSensorTripped
-	/// CmdSensorArmed
+	/// CmdDeviceTripped
+	/// CmdDeviceArmed
 	S_SMOKE,
 
 	/// Water leak sensor
-	/// CmdSensorTripped
-	/// CmdSensorArmed
+	/// CmdDeviceTripped
+	/// CmdDeviceArmed
 	S_WATER_LEAK,
 
 	/// Binary on/off light
-	/// CmdSensorState
-	/// CmdSensorPower
+	/// CmdDeviceState
+	/// CmdDevicePower
 	S_LIGHT,
 
 	/// Binary switch sensor
-	/// CmdSensorState
+	/// CmdDeviceState
 	S_BINARY_SWITCH,
 
 	/// Rotary switch sensor. E.g. rotary encoder which can be turned or clicked
-	/// CmdSensorTripped - Tripped value is send when clicking encoder (when supported)
-	/// CmdSensorLevel
+	/// CmdDeviceTripped - Tripped value is send when clicking encoder (when supported)
+	/// CmdDeviceLevel
 	S_ROTARY_ENCODER_SENSOR,
 
 	/// Rotary potentiometer sensor. This sensor has end stops.
-	/// CmdSensorPercentage - Sketch recalculate potentiometer value to a number between 0-100
+	/// CmdDevicePercentage - Sketch recalculate potentiometer value to a number between 0-100
 	S_POTENTIOMETER_SENSOR,
 
 	/// Controllable acutators that not match the light device
-	/// CmdSensorState
+	/// CmdDeviceState
 	S_SWITCH,
 
 	/// Dimmable actuator
-	/// CmdSensorState
-	/// CmdSensorPercentage
-	/// CmdSensorPower
+	/// CmdDeviceState
+	/// CmdDevicePercentage
+	/// CmdDevicePower
 	S_DIMMABLE,
 
 	/// RGB Light (with red, green, blue component)
-	/// CmdSensorState
-	/// CmdSensorRGB
-	/// CmdSensorPower
+	/// CmdDeviceState
+	/// CmdDeviceRGB
+	/// CmdDevicePower
 	S_RGB,
 
 	/// RGBW Light (with red, green, blue white component)
-	/// CmdSensorState
-	/// CmdSensorRGBW
-	/// CmdSensorPower
+	/// CmdDeviceState
+	/// CmdDeviceRGBW
+	/// CmdDevicePower
 	S_RGBW,
 
 	/// Window covers or shades
-	/// CmdSensorState - 0 close, 1 open
-	/// CmdSensorPercentage - 0 closed - 100 fully open
-	/// CmdSensorStop - stops blinds or window cover in the middle of motion.
+	/// CmdDeviceState - 0 close, 1 open
+	/// CmdDevicePercentage - 0 closed - 100 fully open
+	/// CmdDeviceStop - stops blinds or window cover in the middle of motion.
 	S_WINDOW_COVER,
 
 	/// Temperature sensor (*)
-	/// CmdSensorLevel (N) - Current temperature level in degrees celsius <int or float>
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceLevel (N) - Current temperature level in degrees celsius <int or float>
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_THERMOMETER,
 
 	/// Humidity sensor (*)
-	/// CmdSensorPercentage (N)
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDevicePercentage (N)
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_HUMIDITY,
 
 	/// Barometer sensor or Pressure sensor (*)
-	/// CmdSensorLevel (N) - Pressure level in hPa
-	/// CmdSensorMode (N) - Whether forecast. One of 0="stable", 1="sunny", 2="cloudy", 3="unstable", 4="thunderstorm" or 5="unknown"
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceLevel (N) - Pressure level in hPa
+	/// CmdDeviceMode (N) - Whether forecast. One of 0="stable", 1="sunny", 2="cloudy", 3="unstable", 4="thunderstorm" or 5="unknown"
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_BAROMETER,
 
 	/// Wind sensor (*)
-	/// CmdSensorLevel (N) - Wind level in m/s (average wind speed during last report period)
-	/// CmdSensorAngle (N) - degrees clockwise from true north <int>
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceLevel (N) - Wind level in m/s (average wind speed during last report period)
+	/// CmdDeviceAngle (N) - degrees clockwise from true north <int>
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_WIND,
 
 	/// Rain sensor (*)
-	/// CmdSensorAccumulated (N) - Accumulated rain in mm
-	/// CmdSensorRate (N) - Rain rate in mm/h
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceAccumulated (N) - Accumulated rain in mm
+	/// CmdDeviceRate (N) - Rain rate in mm/h
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_RAIN,
 
 	/// UV sensor (*)
-	/// CmdSensorLevel (N) - Uv Index level (0-12)
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceLevel (N) - Uv Index level (0-12)
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_UV,
 
 	/// Weight sensor
-	/// CmdSensorLevel - Weight in kg <int, float>
+	/// CmdDeviceLevel - Weight in kg <int, float>
 	S_WEIGHT_SCALE,
 
 	/// Power measuring sensor (*)
-	/// CmdSensorPower (N)
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDevicePower (N)
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_POWER_METER,
 
 	/// Thermostat (for controlling heater or cooler devices)
-	/// CmdSensorState - Turn 1=On, 0=Off heater or cooler power switch.
-	/// CmdSensorMode - Heater/AC mode. One of 0="Off", 1="HeatOn", 2="CoolOn", or 3="AutoChangeOver"
-	/// CmdSensorLevel - Setpoint for ideal temperature in celsius degrees
+	/// CmdDeviceState - Turn 1=On, 0=Off heater or cooler power switch.
+	/// CmdDeviceMode - Heater/AC mode. One of 0="Off", 1="HeatOn", 2="CoolOn", or 3="AutoChangeOver"
+	/// CmdDeviceLevel - Setpoint for ideal temperature in celsius degrees
 	S_THERMOSTAT,
 
 	/// Distance sensor (*)
-	/// CmdSensorLevel (N) - Distance in meters <int, float>
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceLevel (N) - Distance in meters <int, float>
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_DISTANCE,
 
 	/// Light sensor (*)
-	/// CmdSensorLevel (N/C) - Light level in lux
-	/// CmdSensorPercentage (N/U) - Uncalibrated light level in percentage 0-100%
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceLevel (N/C) - Light level in lux
+	/// CmdDevicePercentage (N/U) - Uncalibrated light level in percentage 0-100%
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_LIGHT_SENSOR,
 
 	/// Water meter
-	/// CmdSensorAccumulated - Accumulated water volume in m3 <int, float>
-	/// CmdSensorRate - Flow rate in l/m <int or float>
+	/// CmdDeviceAccumulated - Accumulated water volume in m3 <int, float>
+	/// CmdDeviceRate - Flow rate in l/m <int or float>
 	S_WATER_METER,
 
 	/// Ph sensor (*)
-	/// CmdSensorLevel (N) - Ph level using standard pH scale 0-14 <int or float>
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceLevel (N) - Ph level using standard pH scale 0-14 <int or float>
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_PH,
 
 	/// Scene controller device
-	/// CmdSensorScene
+	/// CmdDeviceScene
 	S_SCENE_CONTROLLER,
 
 	/// Sound sensor (*)
-	/// CmdSensorLevel (N/C) - Calibrated sound level in db
-	/// CmdSensorPercentage (N/U) - Uncalibrated sound level in percentage 0-100%
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceLevel (N/C) - Calibrated sound level in db
+	/// CmdDevicePercentage (N/U) - Uncalibrated sound level in percentage 0-100%
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_SOUND,
 
 	/// Vibration sensor (*)
-	/// CmdSensorLevel (N) - vibration level in Hertz
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceLevel (N) - vibration level in Hertz
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_VIBRATION,
 
 	/// Gyro sensor
@@ -320,11 +320,11 @@ typedef enum {
 	S_GYRO,
 
 	/// Compass sensor
-	/// CmdSensorAngle - degrees clockwise from true north <int>
+	/// CmdDeviceAngle - degrees clockwise from true north <int>
 	S_COMPASS,
 
 	/// Lock device
-	/// CmdSensorLocked - 1=Locked/Lock, 0=Unlocked/Unlock
+	/// CmdDeviceLocked - 1=Locked/Lock, 0=Unlocked/Unlock
 	S_LOCK,
 
 	/// IR sender device
@@ -336,10 +336,10 @@ typedef enum {
 	S_IR_RECEIVER,
 
 	/// A list of more or less common gas sensors  (*)
-	/// CmdSensorLevel (N/C) - Gas level in ug/m3
-	/// CmdSensorPercentage (N/U) - Uncalibrated gas level
-	/// CmdSensorTripped (B)
-	/// CmdSensorArmed (B)
+	/// CmdDeviceLevel (N/C) - Gas level in ug/m3
+	/// CmdDevicePercentage (N/U) - Uncalibrated gas level
+	/// CmdDeviceTripped (B)
+	/// CmdDeviceArmed (B)
 	S_DUST=100,			// Dust sensor
 	S_CARBON_MONOXIDE, 	// Carbon Monoxide – CO
 	S_CARBON_DIOXIDE, 	// Carbon Dioxide – CO2
@@ -571,11 +571,11 @@ typedef struct {
 	uint8_t device;
 
 	MySesnorsDynamicPayload value;
-} CmdSensorDynamic;
+} CmdDeviceDynamic;
 
-typedef CmdSensorDynamic CmdSensorLevel;
-typedef CmdSensorDynamic CmdSensorAccumulated;
-typedef CmdSensorDynamic CmdSensorRate;
+typedef CmdDeviceDynamic CmdDeviceLevel;
+typedef CmdDeviceDynamic CmdDeviceAccumulated;
+typedef CmdDeviceDynamic CmdDeviceRate;
 
 typedef struct {
 	/// Id of device that this message concerns.
@@ -592,8 +592,8 @@ typedef struct {
 
 } CmdParamDynamic;
 
-typedef CmdParamDynamic CmdSensorVar;
-typedef CmdParamDynamic CmdSensorConfig;
+typedef CmdParamDynamic CmdDeviceVar;
+typedef CmdParamDynamic CmdDeviceConfig;
 
 
 typedef struct {
@@ -603,7 +603,7 @@ typedef struct {
 	uint8_t r;
 	uint8_t g;
 	uint8_t b;
-} CmdSensorRGB;
+} CmdDeviceRGB;
 
 typedef struct {
 	/// Id of device that this message concerns.
@@ -613,7 +613,7 @@ typedef struct {
 	uint8_t g;
 	uint8_t b;
 	uint8_t w;
-} CmdSensorRGBW;
+} CmdDeviceRGBW;
 
 
 typedef struct {
@@ -623,54 +623,54 @@ typedef struct {
 	uint8_t scene;
 	/// Status ON(1) or OFF(0)
 	uint8_t status;
-} CmdSensorScene;
+} CmdDeviceScene;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// TRIPPED, UNTRIPPED
 	uint8_t status;
-} CmdSensorTripped;
+} CmdDeviceTripped;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	///  ARMED, DISARMED,
 	uint8_t armed;
-} CmdSensorArmed;
+} CmdDeviceArmed;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// Status ON, OFF
 	uint8_t status;
-} CmdSensorStatus;
+} CmdDeviceStatus;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// Status LOCKED, UNLOCKED
 	uint8_t status;
-} CmdSensorLocked;
+} CmdDeviceLocked;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
-} CmdSensorStop;
+} CmdDeviceStop;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// The mode this device should run in .
 	uint8_t mode;
-} CmdSensorMode;
+} CmdDeviceMode;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// Angle in degrees from true north 0-360 .
 	uint16_t angle;
-} CmdSensorAngle;
+} CmdDeviceAngle;
 
 
 typedef struct {
@@ -680,14 +680,14 @@ typedef struct {
 	uint8_t watt;
 	/// The Accumulated kwh
 	uint8_t kwh;
-} CmdSensorPower;
+} CmdDevicePower;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// A Pecentage value between 0-100%
 	uint8_t percentage;
-} CmdSensorPercentage;
+} CmdDevicePercentage;
 
 
 typedef struct {
@@ -695,8 +695,8 @@ typedef struct {
 	uint8_t device;
 	/// For now we have to send predefined ir commands in the node. Just select which code to send or has been received.
 	uint16_t code;
-} CmdIrSend;
-typedef CmdIrSend CmdIrReceived;
+} CmdDeviceIrSend;
+typedef CmdDeviceIrSend CmdDeviceIrReceived;
 
 
 
@@ -781,26 +781,26 @@ struct
 		CmdBatteryLevelReport batteryLevelReport;
 		CmdTimeResponse timeResponse;
 
-		// Device related commands
-		CmdSensorRGB rgb;
-		CmdSensorRGBW rgbw;
-		CmdSensorScene scene;
-		CmdSensorTripped tripped;
-		CmdSensorArmed armed;
-		CmdSensorStatus status;
-		CmdSensorLocked locked;
-		CmdSensorPower power;
-		CmdSensorPercentage percentage;
-		CmdSensorLevel level;
-		CmdSensorAccumulated accumulated;
-		CmdSensorVar var;
-		CmdSensorConfig config;
-		CmdSensorStop stop;
-		CmdSensorRate rate;
-		CmdSensorMode mode;
-		CmdSensorAngle angle;
-		CmdIrReceived receivedIr;
-		CmdIrSend sendIr;
+		// Device related commands (contains a device id)
+		CmdDeviceRGB rgb;
+		CmdDeviceRGBW rgbw;
+		CmdDeviceScene scene;
+		CmdDeviceTripped tripped;
+		CmdDeviceArmed armed;
+		CmdDeviceStatus status;
+		CmdDeviceLocked locked;
+		CmdDevicePower power;
+		CmdDevicePercentage percentage;
+		CmdDeviceLevel level;
+		CmdDeviceAccumulated accumulated;
+		CmdDeviceVar var;
+		CmdDeviceConfig config;
+		CmdDeviceStop stop;
+		CmdDeviceRate rate;
+		CmdDeviceMode mode;
+		CmdDeviceAngle angle;
+		CmdDeviceIrReceived receivedIr;
+		CmdDeviceIrSend sendIr;
 	}  __attribute__((packed));
 
 #ifdef __cplusplus
