@@ -21,10 +21,10 @@
 #define PROTOCOL_VERSION 3
 #define MAX_MESSAGE_LENGTH 32
 #define NETWORK_HEADER_SIZE 5
-#define MAX_PAYLOAD (MAX_MESSAGE_LENGTH - NETWORK_HEADER_SIZE)	// Max payload for SET/REQ commands
+#define MAX_PAYLOAD (MAX_MESSAGE_LENGTH - NETWORK_HEADER_SIZE)	// Max payload for message part
 
 
-// Some help defines to make sketch code more readablein sketches
+// Statuses for MSG_DEV_TRIPPED, MSG_DEV_ARMED, MSG_DEV_STATUS, MSG_DEV_LOCKED,
 #define ARMED 1
 #define DISARMED 0
 #define ARM 1
@@ -40,279 +40,306 @@
 #define LOCK 1
 #define UNLOCK 0
 
+// Modes for MSG_DEV_MODE of DEV_BAROMETER
+#define BARO_STABLE 0
+#define BARO_SUNNY 1
+#define BARO_CLOUDY 2
+#define BARO_UNSTABLE 3
+#define BARO_THUNDERSTORM 4
+#define BARO_UNKNOWN 5
 
-/// Command types
+
+
+/// Message types
 typedef enum {
-	/// Node command sent to controller when sketch calls setup()
-	CMD_NODE,
 
-	/// Firmware OTA transmission commands.
-	CMD_FIRMWARE_CONFIG_REQUEST=10,
-	CMD_FIRMWARE_CONFIG_RESPONSE,
-	CMD_FIRMWARE_REQUEST,
-	CMD_FIRMWARE_RESPONSE,
+	/// Firmware OTA transmission messages.
+	MSG_FIRMWARE_CONFIG_REQUEST,
+	MSG_FIRMWARE_CONFIG_RESPONSE,
+	MSG_FIRMWARE_REQUEST,
+	MSG_FIRMWARE_RESPONSE,
+
+	/// Sent from gateway to controller when it's ready for action. No OTA
+	MSG_GATEWAY_READY,
+	/// Activate/deactivate inclusion mode. Used between gateway and controller. No OTA
+	MSG_INCLUSION_MODE,
+
+	/// Node message sent to controller when sketch calls setup()
+	/// MsgNode
+	MSG_NODE,
 
 	/// Used to report sketch or gateway version to controller. sendSketchInfo()
-	CMD_VERSION,
+	/// MsgVersion
+	MSG_VERSION,
+
 	/// Used to report sketch name to controller. sendSketchInfo()
-	CMD_NAME,
-	/// Sent from gateway to controller when it's ready for action.
-	CMD_GATEWAY_READY,
+	/// MsgName
+	MSG_NAME,
+
 	/// Present devices attached to a node. Payload is the ChildSensorType.
-	CMD_PRESENTATION,
+	/// MsgPresentation
+	MSG_PRESENTATION,
+
 	/// Request a new id from controller.
-	CMD_ID,
+	/// MsgIdRequest
+	MSG_ID,
+
 	/// Broadcased message from a node to request neighbouring repeaters and gateway to
 	/// report their distance to controller back.
-	CMD_FIND_PARENT,
+	/// MsgFindParent
+	MSG_FIND_PARENT,
+
 	/// Send in a log message to controllers application log.
-	CMD_LOG_MESSAGE,
+	/// MsgLogMessage
+	MSG_LOG_MESSAGE,
 
-	// Report battery level. sendBatteryLevel()
-	CMD_BATTERY_LEVEL,
+	/// Report battery level. sendBatteryLevel()
+	/// MsgBatteryLevel
+	MSG_BATTERY_LEVEL,
+
 	/// Request time from controller. requestTime(). Reply in seconds since 1970.
-	CMD_TIME,
+	/// MsgTime
+	MSG_TIME,
 
-	/// Reebot node command. Requires special bootloader on the arduino.
-	CMD_RESET,
+	/// Reebot node message. Requires special bootloader on the arduino.
+	/// MsgReset
+	MSG_RESET,
 
-	/// Activate/deactivate inclusion mode. Used between gateway and controller
-	CMD_INCLUSION_MODE,
 
 	///
-	/// Below follows device related commands
+	/// Below follows device related messages
 	///
 
 	/// Send RGB(W) value for led light
-	CMD_DEV_RGB,
-	CMD_DEV_RGBW,
+	MSG_DEV_RGB,
+	MSG_DEV_RGBW,
 
-	/// Scene command (turns on/off a scene on controller)
-	CMD_DEV_SCENE,
+	/// Scene message (turns on/off a scene on controller)
+	MSG_DEV_SCENE,
 
-	/// Send a binary state commands.
-	CMD_DEV_TRIPPED,
-	CMD_DEV_ARMED,
-	CMD_DEV_STATUS,
-	CMD_DEV_LOCKED,
+	/// Send a binary state messages.
+	MSG_DEV_TRIPPED,
+	MSG_DEV_ARMED,
+	MSG_DEV_STATUS,
+	MSG_DEV_LOCKED,
 
 	/// Send watt and kwh
-	CMD_DEV_POWER,
+	MSG_DEV_POWER,
 
 	// Send a percentage value for things like window cover position, dimmable light and uncalibrated light levels
-	CMD_DEV_PERCENTAGE,
+	MSG_DEV_PERCENTAGE,
 
 	// Send a level value from or to a device.
-	CMD_DEV_LEVEL,
+	MSG_DEV_LEVEL,
 
 	// Send or request config parameters
-	CMD_DEV_CONFIG,
+	MSG_DEV_CONFIG,
 	// Send or request device variables
-	CMD_DEV_VAR,
+	MSG_DEV_VAR,
 
-	// Stop command which can interrupt motion of blinds or window cover
-	CMD_DEV_STOP,
+	// Stop message which can interrupt motion of blinds or window cover
+	MSG_DEV_STOP,
 
 	// Ackumelated value for sensor e.g. rain, water meter
-	CMD_DEV_ACCUMULATED,
+	MSG_DEV_ACCUMULATED,
 
 	// Rate values e.g. rain
-	CMD_DEV_RATE,
+	MSG_DEV_RATE,
 
 	// Set mode for the device (different meaning for each device)
-	CMD_DEV_MODE,
+	MSG_DEV_MODE,
 
 	// Angle report (e.g. compass, wind)
-	CMD_DEV_ANGLE,
+	MSG_DEV_ANGLE,
 
-	// Send or received IR command
-	CMD_DEV_IR_SEND,
-	CMD_DEV_IR_RECEIVED
+	// Send or received IR message
+	MSG_DEV_IR_SEND,
+	MSG_DEV_IR_RECEIVED
 
 };
-typedef uint8_t MySensorCommand;
+typedef uint8_t MySensorMessageTypes;
 
 
 
 /**
  * The devices always report their data in SI units.
- * All supported commands is listed per device
- * CmdDeviceVar and CmdDeviceConfig is supported by all device types.
+ * All supported messages is listed per device
+ * MsgDeviceVar and MsgDeviceConfig is supported by all device types.
  *
  * (*) Means that sensor has different modes. Binary/Normal, Calibrated/Uncalibrated.
  * These modes is sent in with the presenttion message.
  * Binary sensors acts as security sensors and send in a tripped value when
  * some predefined criteria is meet.
- * Commands marked (B) is used in binary mode and (N) in normal mode
- * Commands makred (C) can send calibrated or (U) uncalibrated values.
+ * Messages marked (B) is used in binary mode and (N) in normal mode
+ * Messages makred (C) can send calibrated or (U) uncalibrated values.
  *
  */
 typedef enum {
 	/// Door sensor
-	/// CmdDeviceTripped
-	/// CmdDeviceArmed
+	/// MsgDeviceTripped
+	/// MsgDeviceArmed
 	DEV_DOOR,
 
 	/// Window sensor
-	/// CmdDeviceTripped
-	/// CmdDeviceArmed
+	/// MsgDeviceTripped
+	/// MsgDeviceArmed
 	DEV_WINDOW,
 
 	/// Motion sensor
-	/// CmdDeviceTripped
-	/// CmdDeviceArmed
+	/// MsgDeviceTripped
+	/// MsgDeviceArmed
 	DEV_MOTION,
 
 	/// Smoke sensor
-	/// CmdDeviceTripped
-	/// CmdDeviceArmed
+	/// MsgDeviceTripped
+	/// MsgDeviceArmed
 	DEV_SMOKE,
 
 	/// Water leak sensor
-	/// CmdDeviceTripped
-	/// CmdDeviceArmed
+	/// MsgDeviceTripped
+	/// MsgDeviceArmed
 	DEV_WATER_LEAK,
 
 	/// Binary on/off light
-	/// CmdDeviceState
-	/// CmdDevicePower
+	/// MsgDeviceState
+	/// MsgDevicePower
 	DEV_LIGHT,
 
 	/// Binary switch sensor
-	/// CmdDeviceState
+	/// MsgDeviceState
 	DEV_BINARY_SWITCH,
 
 	/// Rotary switch sensor. E.g. rotary encoder which can be turned or clicked
-	/// CmdDeviceTripped - Tripped value is send when clicking encoder (when supported)
-	/// CmdDeviceLevel
+	/// MsgDeviceTripped - Tripped value is send when clicking encoder (when supported)
+	/// MsgDeviceLevel
 	DEV_ROTARY_ENCODER_SENSOR,
 
 	/// Rotary potentiometer sensor. This sensor has end stops.
-	/// CmdDevicePercentage - Sketch recalculate potentiometer value to a number between 0-100
+	/// MsgDevicePercentage - Sketch recalculate potentiometer value to a number between 0-100
 	DEV_POTENTIOMETER_SENSOR,
 
 	/// Controllable acutators that not match the light device
-	/// CmdDeviceState
+	/// MsgDeviceState
 	DEV_SWITCH,
 
 	/// Dimmable actuator
-	/// CmdDeviceState
-	/// CmdDevicePercentage
-	/// CmdDevicePower
+	/// MsgDeviceState
+	/// MsgDevicePercentage
+	/// MsgDevicePower
 	DEV_DIMMABLE,
 
 	/// RGB Light (with red, green, blue component)
-	/// CmdDeviceState
-	/// CmdDeviceRGB
-	/// CmdDevicePower
+	/// MsgDeviceState
+	/// MsgDeviceRGB
+	/// MsgDevicePower
 	DEV_RGB,
 
 	/// RGBW Light (with red, green, blue white component)
-	/// CmdDeviceState
-	/// CmdDeviceRGBW
-	/// CmdDevicePower
+	/// MsgDeviceState
+	/// MsgDeviceRGBW
+	/// MsgDevicePower
 	DEV_RGBW,
 
 	/// Window covers or shades
-	/// CmdDeviceState - 0 close, 1 open
-	/// CmdDevicePercentage - 0 closed - 100 fully open
-	/// CmdDeviceStop - stops blinds or window cover in the middle of motion.
+	/// MsgDeviceState - 0 close, 1 open
+	/// MsgDevicePercentage - 0 closed - 100 fully open
+	/// MsgDeviceStop - stops blinds or window cover in the middle of motion.
 	DEV_WINDOW_COVER,
 
 	/// Temperature sensor (*)
-	/// CmdDeviceLevel (N) - Current temperature level in degrees celsius <int or float>
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceLevel (N) - Current temperature level in degrees celsius <int or float>
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_THERMOMETER,
 
 	/// Humidity sensor (*)
-	/// CmdDevicePercentage (N)
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDevicePercentage (N)
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_HUMIDITY,
 
 	/// Barometer sensor or Pressure sensor (*)
-	/// CmdDeviceLevel (N) - Pressure level in hPa
-	/// CmdDeviceMode (N) - Whether forecast. One of 0="stable", 1="sunny", 2="cloudy", 3="unstable", 4="thunderstorm" or 5="unknown"
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceLevel (N) - Pressure level in hPa
+	/// MsgDeviceMode (N) - Whether forecast. One of 0="stable", 1="sunny", 2="cloudy", 3="unstable", 4="thunderstorm" or 5="unknown"
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_BAROMETER,
 
 	/// Wind sensor (*)
-	/// CmdDeviceLevel (N) - Wind level in m/s (average wind speed during last report period)
-	/// CmdDeviceAngle (N) - degrees clockwise from true north <int>
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceLevel (N) - Wind level in m/s (average wind speed during last report period)
+	/// MsgDeviceAngle (N) - degrees clockwise from true north <int>
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_WIND,
 
 	/// Rain sensor (*)
-	/// CmdDeviceAccumulated (N) - Accumulated rain in mm
-	/// CmdDeviceRate (N) - Rain rate in mm/h
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceAccumulated (N) - Accumulated rain in mm
+	/// MsgDeviceRate (N) - Rain rate in mm/h
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_RAIN,
 
 	/// UV sensor (*)
-	/// CmdDeviceLevel (N) - Uv Index level (0-12)
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceLevel (N) - Uv Index level (0-12)
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_UV,
 
 	/// Weight sensor
-	/// CmdDeviceLevel - Weight in kg <int, float>
+	/// MsgDeviceLevel - Weight in kg <int, float>
 	DEV_WEIGHT_SCALE,
 
 	/// Power measuring sensor (*)
-	/// CmdDevicePower (N)
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDevicePower (N)
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_POWER_METER,
 
 	/// Thermostat (for controlling heater or cooler devices)
-	/// CmdDeviceState - Turn 1=On, 0=Off heater or cooler power switch.
-	/// CmdDeviceMode - Heater/AC mode. One of 0="Off", 1="HeatOn", 2="CoolOn", or 3="AutoChangeOver"
-	/// CmdDeviceLevel - Setpoint for ideal temperature in celsius degrees
+	/// MsgDeviceState - Turn 1=On, 0=Off heater or cooler power switch.
+	/// MsgDeviceMode - Heater/AC mode. One of 0="Off", 1="HeatOn", 2="CoolOn", or 3="AutoChangeOver"
+	/// MsgDeviceLevel - Setpoint for ideal temperature in celsius degrees
 	DEV_THERMOSTAT,
 
 	/// Distance sensor (*)
-	/// CmdDeviceLevel (N) - Distance in meters <int, float>
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceLevel (N) - Distance in meters <int, float>
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_DISTANCE,
 
 	/// Light sensor (*)
-	/// CmdDeviceLevel (N/C) - Light level in lux
-	/// CmdDevicePercentage (N/U) - Uncalibrated light level in percentage 0-100%
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceLevel (N/C) - Light level in lux
+	/// MsgDevicePercentage (N/U) - Uncalibrated light level in percentage 0-100%
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_LIGHT_SENSOR,
 
 	/// Water meter
-	/// CmdDeviceAccumulated - Accumulated water volume in m3 <int, float>
-	/// CmdDeviceRate - Flow rate in l/m <int or float>
+	/// MsgDeviceAccumulated - Accumulated water volume in m3 <int, float>
+	/// MsgDeviceRate - Flow rate in l/m <int or float>
 	DEV_WATER_METER,
 
 	/// Ph sensor (*)
-	/// CmdDeviceLevel (N) - Ph level using standard pH scale 0-14 <int or float>
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceLevel (N) - Ph level using standard pH scale 0-14 <int or float>
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_PH,
 
 	/// Scene controller device
-	/// CmdDeviceScene
+	/// MsgDeviceScene
 	DEV_SCENE_CONTROLLER,
 
 	/// Sound sensor (*)
-	/// CmdDeviceLevel (N/C) - Calibrated sound level in db
-	/// CmdDevicePercentage (N/U) - Uncalibrated sound level in percentage 0-100%
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceLevel (N/C) - Calibrated sound level in db
+	/// MsgDevicePercentage (N/U) - Uncalibrated sound level in percentage 0-100%
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_SOUND,
 
 	/// Vibration sensor (*)
-	/// CmdDeviceLevel (N) - vibration level in Hertz
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceLevel (N) - vibration level in Hertz
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_VIBRATION,
 
 	/// Gyro sensor
@@ -320,26 +347,26 @@ typedef enum {
 	DEV_GYRO,
 
 	/// Compass sensor
-	/// CmdDeviceAngle - degrees clockwise from true north <int>
+	/// MsgDeviceAngle - degrees clockwise from true north <int>
 	DEV_COMPASS,
 
 	/// Lock device
-	/// CmdDeviceLocked - 1=Locked/Lock, 0=Unlocked/Unlock
+	/// MsgDeviceLocked - 1=Locked/Lock, 0=Unlocked/Unlock
 	DEV_LOCK,
 
 	/// IR sender device
-	/// CmdIrSend
+	/// MsgIrSend
 	DEV_IR_SENDER,
 
 	/// IR receiver device
-	/// CmdIrReceived
+	/// MsgIrReceived
 	DEV_IR_RECEIVER,
 
 	/// A list of more or less common gas sensors  (*)
-	/// CmdDeviceLevel (N/C) - Gas level in ug/m3
-	/// CmdDevicePercentage (N/U) - Uncalibrated gas level
-	/// CmdDeviceTripped (B)
-	/// CmdDeviceArmed (B)
+	/// MsgDeviceLevel (N/C) - Gas level in ug/m3
+	/// MsgDevicePercentage (N/U) - Uncalibrated gas level
+	/// MsgDeviceTripped (B)
+	/// MsgDeviceArmed (B)
 	DEV_DUST=100,			// Dust sensor
 	DEV_CARBON_MONOXIDE, 	// Carbon Monoxide – CO
 	DEV_CARBON_DIOXIDE, 	// Carbon Dioxide – CO2
@@ -452,48 +479,55 @@ typedef struct
 	///   0: Request an ack - Indicator that receiver should send an ack back.
 	///		 These messages should be replied with the same message/payload and the IsAckMessage bit set.
 	///   1: Is ack messsage - Indicator that this is an ack message.
-	///   2: Indication if this is a request command (e.g. request config from controller or data from node)
+	///   2: Indication if this is a request message (e.g. request config from controller or data from node)
 	///		 They should be replied with the actual value
 	/// 3-7: Reserved
 	uint8_t flags;
 
-	/// Command type
-	uint8_t command;
+	/// Message type
+	MySensorMessageTypes type;
 } NetworkHeaderDefault;
 
 
 #define FIRMWARE_BLOCK_SIZE	16
 
+/// This is the base class for all messages
+typedef struct {
+	/// Length of message. This is not transmitted over the air but mainly used for
+	/// Dynamic length messages
+	uint8_t length;
+} MyMessage;
+
 typedef struct
 {
 	uint8_t version;
-} CmdFirmwareConfigRequest;
+} MsgFirmwareConfigRequest;
 
 typedef struct
 {
 	uint8_t version;
 	uint16_t blocks;
 	uint16_t crc;
-} CmdFirmwareConfigResponse;
+} MsgFirmwareConfigResponse;
 
 typedef struct
 {
 	uint8_t version;
 	uint16_t block;
-} CmdFirmwareRequest;
+} MsgFirmwareRequest;
 
 typedef struct
 {
 	uint8_t version;
 	uint16_t block;
 	uint8_t data[FIRMWARE_BLOCK_SIZE];
-} CmdFirmwareResponse;
+} MsgFirmwareResponse;
 
 
 typedef struct {
 	uint8_t libraryVersion;
 	uint8_t isRepeater;
-} CmdNode;
+} MsgNode;
 
 typedef struct {
 	/// Id of device that this message concerns.
@@ -507,40 +541,40 @@ typedef struct {
 	/// Indicator if this sensor will report as a calibrated or uncalibrated percentage (where applicable)
 	/// 0=uncalibrated, 1=calibrated
 	uint8_t calibrated;
-} CmdPresentation;
+} MsgPresentation;
 
 typedef struct {
-	uint8_t version[MAX_PAYLOAD];
-} CmdVersionReport;
+	uint8_t version[MAX_PAYLOAD+1];
+} MsgVersion;
 
 typedef struct {
-	uint8_t name[MAX_PAYLOAD];
-} CmdNameReport;
+	uint8_t name[MAX_PAYLOAD+1];
+} MsgName;
 
 typedef struct {
 	uint16_t requestIdentifier;
-} CmdIdRequest;
-
-typedef struct {
 	uint8_t newId;
-	uint16_t requestIdentifier;
-} CmdIdResponse;
+} MsgIdRequest;
 
 typedef struct {
 	uint8_t distance;
-} CmdFindParentResponse;
+} MsgFindParent;
 
 typedef struct {
-	uint8_t message[MAX_PAYLOAD];
-} CmdLogMessageReport;
+	uint8_t message[MAX_PAYLOAD+1];
+} MsgLogMessage;
 
 typedef struct {
 	uint8_t level;
-} CmdBatteryLevelReport;
+} MsgBatteryLevel;
 
 typedef struct {
 	uint32_t time;
-} CmdTimeResponse;
+} MsgTime;
+
+typedef struct {
+} MsgReset;
+
 
 typedef struct {
 	/// Payload data type
@@ -571,11 +605,11 @@ typedef struct {
 	uint8_t device;
 
 	MySesnorsDynamicPayload value;
-} CmdDeviceDynamic;
+} MsgDeviceDynamic;
 
-typedef CmdDeviceDynamic CmdDeviceLevel;
-typedef CmdDeviceDynamic CmdDeviceAccumulated;
-typedef CmdDeviceDynamic CmdDeviceRate;
+typedef MsgDeviceDynamic MsgDeviceLevel;
+typedef MsgDeviceDynamic MsgDeviceAccumulated;
+typedef MsgDeviceDynamic MsgDeviceRate;
 
 typedef struct {
 	/// Id of device that this message concerns.
@@ -590,10 +624,10 @@ typedef struct {
 	/// Payload value
 	MySesnorsDynamicPayload value;
 
-} CmdParamDynamic;
+} MsgParamDynamic;
 
-typedef CmdParamDynamic CmdDeviceVar;
-typedef CmdParamDynamic CmdDeviceConfig;
+typedef MsgParamDynamic MsgDeviceVar;
+typedef MsgParamDynamic MsgDeviceConfig;
 
 
 typedef struct {
@@ -603,7 +637,7 @@ typedef struct {
 	uint8_t r;
 	uint8_t g;
 	uint8_t b;
-} CmdDeviceRGB;
+} MsgDeviceRGB;
 
 typedef struct {
 	/// Id of device that this message concerns.
@@ -613,7 +647,7 @@ typedef struct {
 	uint8_t g;
 	uint8_t b;
 	uint8_t w;
-} CmdDeviceRGBW;
+} MsgDeviceRGBW;
 
 
 typedef struct {
@@ -623,54 +657,54 @@ typedef struct {
 	uint8_t scene;
 	/// Status ON(1) or OFF(0)
 	uint8_t status;
-} CmdDeviceScene;
+} MsgDeviceScene;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// TRIPPED, UNTRIPPED
 	uint8_t status;
-} CmdDeviceTripped;
+} MsgDeviceTripped;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	///  ARMED, DISARMED,
 	uint8_t armed;
-} CmdDeviceArmed;
+} MsgDeviceArmed;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// Status ON, OFF
 	uint8_t status;
-} CmdDeviceStatus;
+} MsgDeviceStatus;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// Status LOCKED, UNLOCKED
 	uint8_t status;
-} CmdDeviceLocked;
+} MsgDeviceLocked;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
-} CmdDeviceStop;
+} MsgDeviceStop;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// The mode this device should run in .
 	uint8_t mode;
-} CmdDeviceMode;
+} MsgDeviceMode;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// Angle in degrees from true north 0-360 .
 	uint16_t angle;
-} CmdDeviceAngle;
+} MsgDeviceAngle;
 
 
 typedef struct {
@@ -680,23 +714,23 @@ typedef struct {
 	uint8_t watt;
 	/// The Accumulated kwh
 	uint8_t kwh;
-} CmdDevicePower;
+} MsgDevicePower;
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// A Pecentage value between 0-100%
 	uint8_t percentage;
-} CmdDevicePercentage;
+} MsgDevicePercentage;
 
 
 typedef struct {
 	/// Id of device that this message concerns.
 	uint8_t device;
-	/// For now we have to send predefined ir commands in the node. Just select which code to send or has been received.
+	/// For now we have to send predefined ir messages in the node. Just select which code to send or has been received.
 	uint16_t code;
-} CmdDeviceIrSend;
-typedef CmdDeviceIrSend CmdDeviceIrReceived;
+} MsgDeviceIrSend;
+typedef MsgDeviceIrSend MsgDeviceIrReceived;
 
 
 
@@ -757,50 +791,48 @@ struct
 
 #endif
 	// Network header
-#ifdef MYSENSORS_RF_NRF24
 	NetworkHeaderDefault header;
-#endif
-	/// Command payloads
+	/// Avalilable messages
 	union {
 
-		// Firmaware related conmmands
-		CmdFirmwareConfigRequest firmawareConfigRequest;
-		CmdFirmwareConfigResponse firmawareConfigResponse;
-		CmdFirmwareRequest firmwareRequest;
-		CmdFirmwareResponse firmawareResponse;
+		// Firmaware related messagess
+		MsgFirmwareConfigRequest firmawareConfigRequest;
+		MsgFirmwareConfigResponse firmawareConfigResponse;
+		MsgFirmwareRequest firmwareRequest;
+		MsgFirmwareResponse firmawareResponse;
 
-		// Internal commands used by API
-		CmdNode node;
-		CmdPresentation presentation;
-		CmdVersionReport versonReport;
-		CmdNameReport nameReport;
-		CmdIdRequest idRequest;
-		CmdIdResponse idResponse;
-		CmdFindParentResponse findParentResponse;
-		CmdLogMessageReport logMessageReport;
-		CmdBatteryLevelReport batteryLevelReport;
-		CmdTimeResponse timeResponse;
+		// Internal messages used by API
+		MsgNode node;
+		MsgPresentation presentation;
+		MsgVersion verson;
+		MsgName name;
+		MsgIdRequest idRequest;
+		MsgFindParent findParent;
+		MsgLogMessage logMessage;
+		MsgBatteryLevel batteryLevel;
+		MsgTime time;
+		MsgReset reset;
 
-		// Device related commands (contains a device id)
-		CmdDeviceRGB rgb;
-		CmdDeviceRGBW rgbw;
-		CmdDeviceScene scene;
-		CmdDeviceTripped tripped;
-		CmdDeviceArmed armed;
-		CmdDeviceStatus status;
-		CmdDeviceLocked locked;
-		CmdDevicePower power;
-		CmdDevicePercentage percentage;
-		CmdDeviceLevel level;
-		CmdDeviceAccumulated accumulated;
-		CmdDeviceVar var;
-		CmdDeviceConfig config;
-		CmdDeviceStop stop;
-		CmdDeviceRate rate;
-		CmdDeviceMode mode;
-		CmdDeviceAngle angle;
-		CmdDeviceIrReceived receivedIr;
-		CmdDeviceIrSend sendIr;
+		// Device related messages (contains a device id)
+		MsgDeviceRGB rgb;
+		MsgDeviceRGBW rgbw;
+		MsgDeviceScene scene;
+		MsgDeviceTripped tripped;
+		MsgDeviceArmed armed;
+		MsgDeviceStatus status;
+		MsgDeviceLocked locked;
+		MsgDevicePower power;
+		MsgDevicePercentage percentage;
+		MsgDeviceLevel level;
+		MsgDeviceAccumulated accumulated;
+		MsgDeviceVar var;
+		MsgDeviceConfig config;
+		MsgDeviceStop stop;
+		MsgDeviceRate rate;
+		MsgDeviceMode mode;
+		MsgDeviceAngle angle;
+		MsgDeviceIrReceived receivedIr;
+		MsgDeviceIrSend sendIr;
 	}  __attribute__((packed));
 
 #ifdef __cplusplus
