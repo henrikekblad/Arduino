@@ -20,7 +20,7 @@
 
 #define PROTOCOL_VERSION 3
 #define MAX_MESSAGE_LENGTH 32
-#define NETWORK_HEADER_SIZE 7									// SET/REQ command header size
+#define NETWORK_HEADER_SIZE 5
 #define MAX_PAYLOAD (MAX_MESSAGE_LENGTH - NETWORK_HEADER_SIZE)	// Max payload for SET/REQ commands
 
 
@@ -132,16 +132,6 @@ typedef enum {
 };
 typedef uint8_t MySensorCommand;
 
-
-
-/*
-
-struct DoorSensor : BinaryCommand, SecurityCommand { };
-
-struct WindowSensor : BinaryCommand, SecurityCommand { };
-
-struct MotionSensor : BinaryCommand, SecurityCommand { };
-*/
 
 
 /**
@@ -460,15 +450,16 @@ typedef struct
 	uint8_t destination;
 
 	///   0: Request an ack - Indicator that receiver should send an ack back.
-	///   1: Is ack messsage - Indicator that this is the actual ack message.
-	///   2: Indication if this is a request command (e.g. request config from controller or data from other node)
-	/// 3-7: Length of payload
+	///		 These messages should be replied with the same message/payload and the IsAckMessage bit set.
+	///   1: Is ack messsage - Indicator that this is an ack message.
+	///   2: Indication if this is a request command (e.g. request config from controller or data from node)
+	///		 They should be replied with the actual value
+	/// 3-7: Reserved
 	uint8_t flags;
 
 	/// Command type
 	uint8_t command;
 } NetworkHeaderDefault;
-
 
 
 #define FIRMWARE_BLOCK_SIZE	16
@@ -769,7 +760,7 @@ struct
 #ifdef MYSENSORS_RF_NRF24
 	NetworkHeaderDefault header;
 #endif
-	/// Message command payloads
+	/// Command payloads
 	union {
 
 		// Firmaware related conmmands
