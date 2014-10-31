@@ -16,13 +16,16 @@
 #include <Arduino.h>
 #include <string.h>
 #include <stdint.h>
+#include <JsonGenerator.h>
+#include <JsonParser.h>
+//using namespace ArduinoJson;
 #endif
 
 #define PROTOCOL_VERSION 3
 #define MAX_MESSAGE_LENGTH 32
 #define NETWORK_HEADER_SIZE 5
 #define MAX_PAYLOAD (MAX_MESSAGE_LENGTH - NETWORK_HEADER_SIZE)	// Max payload for message part
-
+#define FIRMWARE_BLOCK_SIZE	16
 
 // Statuses for MSG_DEV_TRIPPED, MSG_DEV_ARMED, MSG_DEV_STATUS, MSG_DEV_LOCKED,
 #define ARMED 1
@@ -81,13 +84,15 @@ typedef enum {
 	MSG_PRESENTATION,
 
 	/// Request a new id from controller.
-	/// MsgIdRequest
-	MSG_ID,
+	/// MsgIdRequest, MsgIdResponse
+	MSG_ID_REQUEST,
+	MSG_ID_RESPONSE,
 
 	/// Broadcased message from a node to request neighbouring repeaters and gateway to
 	/// report their distance to controller back.
-	/// MsgFindParent
-	MSG_FIND_PARENT,
+	/// MsgFindParentRequest, MsgFindParentResponse
+	MSG_FIND_PARENT_REQUEST,
+	MSG_FIND_PARENT_RESPONSE,
 
 	/// Send in a log message to controllers application log.
 	/// MsgLogMessage
@@ -98,8 +103,9 @@ typedef enum {
 	MSG_BATTERY_LEVEL,
 
 	/// Request time from controller. requestTime(). Reply in seconds since 1970.
-	/// MsgTime
-	MSG_TIME,
+	/// MsgTimeRequest, MsgTimeResponse
+	MSG_TIME_REQUEST,
+	MSG_TIME_RESPONSE,
 
 	/// Reebot node message. Requires special bootloader on the arduino.
 	/// MsgReset
@@ -428,14 +434,6 @@ typedef uint8_t MySensorPayloadDataType;
 #define BF_SET(y, x, start, len)    ( y= ((y) &~ BF_MASK(start, len)) | BF_PREP(x, start, len) )
 
 // Getters/setters for special bit fields in header
-#define mSetVersion(_msg,_version) BF_SET(_msg.version_length, _version, 0, 3)
-#define mGetVersion(_msg) BF_GET(_msg.version_length, 0, 3)
-
-#define mSetLength(_msg,_length) BF_SET(_msg.version_length, _length, 3, 5)
-#define mGetLength(_msg) BF_GET(_msg.version_length, 3, 5)
-
-#define mSetCommand(_msg,_command) BF_SET(_msg.command_ack_payload, _command, 0, 3)
-#define mGetCommand(_msg) BF_GET(_msg.command_ack_payload, 0, 3)
 
 #define mSetRequestAck(_msg,_rack) BF_SET(_msg.command_ack_payload, _rack, 3, 1)
 #define mGetRequestAck(_msg) BF_GET(_msg.command_ack_payload, 3, 1)
@@ -443,15 +441,8 @@ typedef uint8_t MySensorPayloadDataType;
 #define mSetAck(_msg,_ackMsg) BF_SET(_msg.command_ack_payload, _ackMsg, 4, 1)
 #define mGetAck(_msg) BF_GET(_msg.command_ack_payload, 4, 1)
 
-#define mSetPayloadType(_msg, _pt) BF_SET(_msg.command_ack_payload, _pt, 5, 3)
-#define mGetPayloadType(_msg) BF_GET(_msg.command_ack_payload, 5, 3)
-
 
 // internal access for special fields
-#define miGetCommand() BF_GET(command_ack_payload, 0, 3)
-
-#define miSetLength(_length) BF_SET(version_length, _length, 3, 5)
-#define miGetLength() BF_GET(version_length, 3, 5)
 
 #define miSetRequestAck(_rack) BF_SET(command_ack_payload, _rack, 3, 1)
 #define miGetRequestAck() BF_GET(command_ack_payload, 3, 1)
@@ -459,14 +450,11 @@ typedef uint8_t MySensorPayloadDataType;
 #define miSetAck(_ack) BF_SET(command_ack_payload, _ack, 4, 1)
 #define miGetAck() BF_GET(command_ack_payload, 4, 1)
 
-#define miSetPayloadType(_pt) BF_SET(command_ack_payload, _pt, 5, 3)
-#define miGetPayloadType() BF_GET(command_ack_payload, 5, 3)
 
 */
 
 
-typedef struct
-{
+struct NetworkHeader {
 	/// Id of last node this message passed
 	uint8_t last;
 
@@ -486,97 +474,21 @@ typedef struct
 
 	/// Message type
 	MySensorMessageTypes type;
-} NetworkHeaderDefault;
+} NetworkHeader;
 
 
-#define FIRMWARE_BLOCK_SIZE	16
 
-/// This is the base class for all messages
-typedef struct {
-	/// Length of message. This is not transmitted over the air but mainly used for
-	/// Dynamic length messages
+struct MyMessage : NetworkHeader {
+	/// Used to store dynamic messages length
 	uint8_t length;
-} MyMessage;
 
-typedef struct
-{
-	uint8_t version;
-} MsgFirmwareConfigRequest;
-
-typedef struct
-{
-	uint8_t version;
-	uint16_t blocks;
-	uint16_t crc;
-} MsgFirmwareConfigResponse;
-
-typedef struct
-{
-	uint8_t version;
-	uint16_t block;
-} MsgFirmwareRequest;
-
-typedef struct
-{
-	uint8_t version;
-	uint16_t block;
-	uint8_t data[FIRMWARE_BLOCK_SIZE];
-} MsgFirmwareResponse;
+//	virtual ~MyMessage() {}
+//	virtual MyMessage fromJson(Parser::JsonObject json) = 0;
+//	virtual Generator::JsonObject toJson() = 0;
+};
 
 
-typedef struct {
-	uint8_t libraryVersion;
-	uint8_t isRepeater;
-} MsgNode;
-
-typedef struct {
-	/// Id of device that this message concerns.
-	uint8_t device;
-	/// The type of device. See table above.
-	MySensorDeviceType type;
-	/// Indicatior if this sensor will report as a security sensor
-	/// in binary mode.
-	/// 0=normal, 1=binary
-	uint8_t binary;
-	/// Indicator if this sensor will report as a calibrated or uncalibrated percentage (where applicable)
-	/// 0=uncalibrated, 1=calibrated
-	uint8_t calibrated;
-} MsgPresentation;
-
-typedef struct {
-	uint8_t version[MAX_PAYLOAD+1];
-} MsgVersion;
-
-typedef struct {
-	uint8_t name[MAX_PAYLOAD+1];
-} MsgName;
-
-typedef struct {
-	uint16_t requestIdentifier;
-	uint8_t newId;
-} MsgIdRequest;
-
-typedef struct {
-	uint8_t distance;
-} MsgFindParent;
-
-typedef struct {
-	uint8_t message[MAX_PAYLOAD+1];
-} MsgLogMessage;
-
-typedef struct {
-	uint8_t level;
-} MsgBatteryLevel;
-
-typedef struct {
-	uint32_t time;
-} MsgTime;
-
-typedef struct {
-} MsgReset;
-
-
-typedef struct {
+struct MySesnorsDynamicPayload : MyMessage {
 	/// Payload data type
 	MySensorPayloadDataType ptype;
 
@@ -596,143 +508,401 @@ typedef struct {
 		char data[MAX_PAYLOAD + 1];
 	} __attribute__((packed));
 
+	// Setters for payload
+	MyMessage& set(void* payload, uint8_t length);
+	MyMessage& set(const char* value);
+	MyMessage& set(uint8_t value);
+	MyMessage& set(float value, uint8_t decimals);
+	MyMessage& set(unsigned long value);
+	MyMessage& set(long value);
+	MyMessage& set(unsigned int value);
+	MyMessage& set(int value);
+};
 
-} MySesnorsDynamicPayload;
 
-
-typedef struct {
+struct MsgDeviceDynamic : MySesnorsDynamicPayload {
 	/// Id of device that this message concerns.
 	uint8_t device;
+};
 
-	MySesnorsDynamicPayload value;
-} MsgDeviceDynamic;
-
-typedef MsgDeviceDynamic MsgDeviceLevel;
-typedef MsgDeviceDynamic MsgDeviceAccumulated;
-typedef MsgDeviceDynamic MsgDeviceRate;
-
-typedef struct {
+struct  MsgParamDynamic : MySesnorsDynamicPayload {
 	/// Id of device that this message concerns.
 	uint8_t device;
 
 	/// Id of config or var param to set or get
 	uint8_t param;
+};
 
-	/// Payload data type
-	MySensorPayloadDataType ptype;
+struct MsgDeviceLevel : MsgDeviceDynamic {
 
-	/// Payload value
-	MySesnorsDynamicPayload value;
+	MsgDeviceLevel() {
+		type = MSG_DEV_LEVEL;
+	}
+};
 
-} MsgParamDynamic;
+struct MsgDeviceAccumulated : MsgDeviceDynamic {
 
-typedef MsgParamDynamic MsgDeviceVar;
-typedef MsgParamDynamic MsgDeviceConfig;
+	MsgDeviceAccumulated() {
+		type = MSG_DEV_ACCUMULATED;
+	}
+};
+
+struct MsgDeviceRate : MsgDeviceDynamic {
+
+	MsgDeviceRate() {
+		type = MSG_DEV_RATE;
+	}
+};
+
+struct MsgDeviceVar : MsgParamDynamic {
+
+	MsgDeviceVar() {
+		type = MSG_DEV_VAR;
+	}
+};
+
+struct MsgDeviceConfig : MsgParamDynamic {
+
+	MsgDeviceConfig() {
+		type = MSG_DEV_CONFIG;
+	}
+};
 
 
-typedef struct {
+struct MsgFirmwareConfigRequest : MyMessage {
+	uint8_t version;
+
+	MsgFirmwareConfigRequest() {
+		type = MSG_FIRMWARE_CONFIG_REQUEST;
+	}
+
+/*	virtual Generator::JsonObject toJson() {
+	    Gererator::JsonObject<1> json;
+	    json["version"] = version;
+	    return json;
+	}
+
+	virtual MyMessage fromJson(Parser::JsonObject json) {
+		MyMessage msg = new MsgFirmwareConfigRequest;
+		msg.version = json["version"];
+		return msg;
+	}
+*/
+
+};
+
+
+struct MsgFirmwareConfigResponse : MyMessage {
+	uint8_t version;
+	uint16_t blocks;
+	uint16_t crc;
+
+	MsgFirmwareConfigResponse() {
+		type = MSG_FIRMWARE_CONFIG_RESPONSE;
+	}
+};
+
+struct MsgFirmwareRequest : MyMessage {
+	uint8_t version;
+	uint16_t block;
+
+	MsgFirmwareRequest() {
+		type = MSG_FIRMWARE_REQUEST;
+	}
+};
+
+struct MsgFirmwareResponse : MyMessage {
+	uint8_t version;
+	uint16_t block;
+	uint8_t data[FIRMWARE_BLOCK_SIZE];
+
+	MsgFirmwareResponse() {
+		type = MSG_FIRMWARE_RESPONSE;
+	}
+};
+
+struct MsgNode : MyMessage {
+	// Library version of this node
+	uint8_t libraryVersion;
+	/// Is repeater enabled for this node?
+	uint8_t isRepeater;
+	/// Parent node
+	uint8_t parent;
+
+	MsgNode() {
+		type = MSG_NODE;
+	}
+};
+
+struct MsgPresentation : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
-	/// Red, Green, Blue and white component value.
+	/// The type of device. See table above.
+	MySensorDeviceType type;
+	/// Indicatior if this sensor will report as a security sensor
+	/// in binary mode.
+	/// 0=normal, 1=binary
+	uint8_t binary;
+	/// Indicator if this sensor will report as a calibrated or uncalibrated percentage (where applicable)
+	/// 0=uncalibrated, 1=calibrated
+	uint8_t calibrated;
+
+	MsgPresentation() {
+		type = MSG_PRESENTATION;
+	}
+};
+
+struct MsgVersion : MyMessage {
+	uint8_t version[MAX_PAYLOAD+1];
+
+	MsgVersion() {
+		type = MSG_VERSION;
+	}
+};
+
+struct MsgName : MyMessage {
+	uint8_t name[MAX_PAYLOAD+1];
+
+	MsgName() {
+		type = MSG_NAME;
+	}
+};
+
+struct MsgIdRequest : MyMessage {
+	uint16_t requestIdentifier;
+
+	MsgIdRequest() {
+		type = MSG_ID_REQUEST;
+	}
+};
+
+struct MsgIdResponse : MyMessage {
+	uint16_t requestIdentifier;
+	uint8_t newId;
+
+	MsgIdResponse() {
+		type = MSG_ID_RESPONSE;
+	}
+};
+
+
+struct MsgFindParentRequest : MyMessage  {
+
+	MsgFindParentRequest() {
+		type = MSG_FIND_PARENT_REQUEST;
+	}
+};
+
+struct MsgFindParentResponse : MyMessage  {
+	uint8_t distance;
+
+	MsgFindParentResponse() {
+		type = MSG_FIND_PARENT_RESPONSE;
+	}
+};
+
+
+struct MsgLogMessage : MyMessage {
+	uint8_t message[MAX_PAYLOAD+1];
+
+	MsgLogMessage() {
+		type = MSG_LOG_MESSAGE;
+	}
+};
+
+struct MsgBatteryLevel : MyMessage {
+	uint8_t level;
+
+	MsgBatteryLevel() {
+		type = MSG_BATTERY_LEVEL;
+	}
+};
+
+struct MsgTimeRequest : MyMessage  {
+
+	MsgTimeRequest() {
+		type = MSG_TIME_REQUEST;
+	}
+};
+
+struct MsgTimeResponse : MyMessage  {
+	uint32_t time;
+
+	MsgTimeResponse() {
+		type = MSG_TIME_RESPONSE;
+	}
+};
+
+struct MsgReset : MyMessage  {
+
+	MsgReset() {
+		type = MSG_RESET;
+	}
+};
+
+struct MsgDeviceRGB : MyMessage {
+	/// Id of device that this message concerns.
+	uint8_t device;
+	/// Red, Green and Blue component value 0-255.
 	uint8_t r;
 	uint8_t g;
 	uint8_t b;
-} MsgDeviceRGB;
 
-typedef struct {
+	MsgDeviceRGB() {
+		type = MSG_DEV_RGB;
+	}
+};
+
+struct MsgDeviceRGBW : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
-	/// Red, Green, Blue and white component value.
+	/// Red, Green, Blue and white component value 0-255.
 	uint8_t r;
 	uint8_t g;
 	uint8_t b;
 	uint8_t w;
-} MsgDeviceRGBW;
 
+	MsgDeviceRGBW() {
+		type = MSG_DEV_RGBW;
+	}
+};
 
-typedef struct {
+struct MsgDeviceScene : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// Scene number 0-255
 	uint8_t scene;
 	/// Status ON(1) or OFF(0)
 	uint8_t status;
-} MsgDeviceScene;
 
-typedef struct {
+	MsgDeviceScene() {
+		type = MSG_DEV_SCENE;
+	}
+};
+
+struct MsgDeviceTripped : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// TRIPPED, UNTRIPPED
 	uint8_t status;
-} MsgDeviceTripped;
 
-typedef struct {
+	MsgDeviceTripped() {
+		type = MSG_DEV_TRIPPED;
+	}
+};
+
+struct MsgDeviceArmed : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	///  ARMED, DISARMED,
 	uint8_t armed;
-} MsgDeviceArmed;
 
-typedef struct {
+	MsgDeviceArmed() {
+		type = MSG_DEV_ARMED;
+	}
+};
+
+struct MsgDeviceStatus : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// Status ON, OFF
 	uint8_t status;
-} MsgDeviceStatus;
 
-typedef struct {
+	MsgDeviceStatus() {
+		type = MSG_DEV_STATUS;
+	}
+};
+
+struct MsgDeviceLocked : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
-	/// Status LOCKED, UNLOCKED
+	/// Status LOCKED, UNLOCKED or LOCK, UNLOCK
 	uint8_t status;
-} MsgDeviceLocked;
 
-typedef struct {
+	MsgDeviceLocked() {
+		type = MSG_DEV_LOCKED;
+	}
+};
+
+struct MsgDeviceStop : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
-} MsgDeviceStop;
 
-typedef struct {
+	MsgDeviceStop() {
+		type = MSG_DEV_STOP;
+	}
+};
+
+struct MsgDeviceMode : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// The mode this device should run in .
 	uint8_t mode;
-} MsgDeviceMode;
 
-typedef struct {
+	MsgDeviceMode() {
+		type = MSG_DEV_MODE;
+	}
+};
+
+struct MsgDeviceAngle : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// Angle in degrees from true north 0-360 .
 	uint16_t angle;
-} MsgDeviceAngle;
 
+	MsgDeviceAngle() {
+		type = MSG_DEV_ANGLE;
+	}
+};
 
-typedef struct {
+struct MsgDevicePower : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// Current watt value
 	uint8_t watt;
 	/// The Accumulated kwh
 	uint8_t kwh;
-} MsgDevicePower;
 
-typedef struct {
+	MsgDevicePower() {
+		type = MSG_DEV_POWER;
+	}
+};
+
+typedef struct MsgDevicePercentage : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// A Pecentage value between 0-100%
 	uint8_t percentage;
-} MsgDevicePercentage;
+
+	MsgDevicePercentage() {
+		type = MSG_DEV_PERCENTAGE;
+	}
+};
 
 
-typedef struct {
+struct MsgDeviceIrSend : MyMessage {
 	/// Id of device that this message concerns.
 	uint8_t device;
 	/// For now we have to send predefined ir messages in the node. Just select which code to send or has been received.
 	uint16_t code;
-} MsgDeviceIrSend;
-typedef MsgDeviceIrSend MsgDeviceIrReceived;
+
+	MsgDeviceIrSend() {
+		type = MSG_DEV_IR_SEND;
+	}
+};
 
 
+struct MsgDeviceIrReceived : MsgDeviceIrSend {
+
+	MsgDeviceIrReceived() {
+			type = MSG_DEV_IR_RECEIVED;
+	}
+};
+
+
+
+
+/*
 
 
 #ifdef __cplusplus
@@ -746,11 +916,9 @@ public:
 
 	char i2h(uint8_t i) const;
 
-	/**
-	 * If payload is something else than P_STRING you can have the payload value converted
-	 * into string representation by supplying a buffer with the minimum size of
-	 * 2*MAX_PAYLOAD+1. This is to be able to fit hex-conversion of a full binary payload.
-	 */
+	// If payload is something else than P_STRING you can have the payload value converted
+	// into string representation by supplying a buffer with the minimum size of
+	// 2*MAX_PAYLOAD+1. This is to be able to fit hex-conversion of a full binary payload.
 	char* getStream(char *buffer) const;
 	char* getString(char *buffer) const;
 	const char* getString() const;
@@ -807,10 +975,13 @@ struct
 		MsgVersion verson;
 		MsgName name;
 		MsgIdRequest idRequest;
-		MsgFindParent findParent;
+		MsgIdResponse idResponse;
+		MsgFindParentRequest findParentRequest;
+		MsgFindParentResponse findParentResponse;
 		MsgLogMessage logMessage;
 		MsgBatteryLevel batteryLevel;
-		MsgTime time;
+		MsgTimeRequest timeRequest;
+		MsgTimeResponse timeResponse;
 		MsgReset reset;
 
 		// Device related messages (contains a device id)
@@ -841,7 +1012,7 @@ struct
 };
 uint8_t array[HEADER_SIZE + MAX_PAYLOAD + 1];	
 } __attribute__((packed)) MyMessage;
-#endif
+#endif */
 
 #endif
 

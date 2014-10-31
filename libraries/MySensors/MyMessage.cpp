@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
+/*
 MyMessage::MyMessage() {
 	destination = 0; // Gateway is default destination
 }
@@ -19,7 +19,7 @@ bool MyMessage::isAck() const {
 }
 
 
-/* Getters for payload converted to desired form */
+// Getters for payload converted to desired form
 void* MyMessage::getCustom() const {
 	return (void *)data;
 }
@@ -166,64 +166,64 @@ MyMessage& MyMessage::setDestination(uint8_t _destination) {
 	destination = _destination;
 	return *this;
 }
+*/
 
-// Set payload
-MyMessage& MyMessage::set(void* value, uint8_t length) {
-	miSetPayloadType(P_CUSTOM);
-	miSetLength(length);
+// Set dynamic payload
+MyMessage& MySesnorsDynamicPayload::set(void* value, uint8_t length) {
+	ptype = P_CUSTOM;
+	this->length = length;
 	memcpy(data, value, min(length, MAX_PAYLOAD));
 	return *this;
 }
 
 
-MyMessage& MyMessage::set(const char* value) {
-	uint8_t length = strlen(value);
-	miSetLength(length);
-	miSetPayloadType(P_STRING);
-	strncpy(data, value, min(length, MAX_PAYLOAD));
+MyMessage& MySesnorsDynamicPayload::set(const char* value) {
+	length = strlen(value);
+	ptype = P_STRING;
+	strncpy(data, value, min(MyMessage::length, MAX_PAYLOAD));
 	return *this;
 }
 
-MyMessage& MyMessage::set(uint8_t value) {
-	miSetLength(1);
-	miSetPayloadType(P_BYTE);
+MyMessage& MySesnorsDynamicPayload::set(uint8_t value) {
+	length = 1;
+	ptype = P_BYTE;
 	data[0] = value;
 	return *this;
 }
 
 
-MyMessage& MyMessage::set(float value, uint8_t decimals) {
-	miSetLength(5); // 32 bit float + persi
-	miSetPayloadType(P_FLOAT32);
+MyMessage& MySesnorsDynamicPayload::set(float value, uint8_t decimals) {
+	ptype = P_FLOAT32;
+	length = 5; // 32 bit float + persi
 	fValue=value;
 	fPrecision = decimals;
 	return *this;
 }
 
-MyMessage& MyMessage::set(unsigned long value) {
-	miSetPayloadType(P_ULONG32);
-	miSetLength(4);
+MyMessage& MySesnorsDynamicPayload::set(unsigned long value) {
+	ptype = P_ULONG32;
+	length = 4;
 	ulValue = value;
 	return *this;
 }
 
-MyMessage& MyMessage::set(long value) {
-	miSetPayloadType(P_LONG32);
-	miSetLength(4);
+MyMessage& MySesnorsDynamicPayload::set(long value) {
+	ptype = P_LONG32;
+	length = 4;
 	lValue = value;
 	return *this;
 }
 
-MyMessage& MyMessage::set(unsigned int value) {
-	miSetPayloadType(P_UINT16);
-	miSetLength(2);
+MyMessage& MySesnorsDynamicPayload::set(unsigned int value) {
+	ptype = P_UINT16;
+	length = 2;
 	uiValue = value;
 	return *this;
 }
 
-MyMessage& MyMessage::set(int value) {
-	miSetPayloadType(P_INT16);
-	miSetLength(2);
+MyMessage& MySesnorsDynamicPayload::set(int value) {
+	ptype = P_INT16;
+	length = 2;
 	iValue = value;
 	return *this;
 }

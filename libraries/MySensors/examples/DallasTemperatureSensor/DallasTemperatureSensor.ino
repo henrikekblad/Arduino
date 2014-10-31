@@ -3,6 +3,8 @@
 #include <SPI.h>
 #include <DallasTemperature.h>
 #include <OneWire.h>
+#include <JsonGenerator.h>
+#include <JsonParser.h>
 
 #ifndef MYSENSORS_SENSOR
 #error Please switch to MYSENSORS_SENSOR in MyConfig.h
@@ -19,7 +21,9 @@ int numSensors=0;
 boolean receivedConfig = false;
 boolean metric = true; 
 // Initialize temperature message
-MyMessage msg(0,V_LEVEL);
+MsgDeviceLevel msg;
+
+
 
 void setup()  
 { 
@@ -29,6 +33,8 @@ void setup()
   // Startup and initialize MySensors library. Set callback for incoming messages. 
   gw.begin(); 
 
+
+
   // Send the sketch version information to the gateway and Controller
   gw.sendSketchInfo("Temperature Sensor", "1.0");
 
@@ -37,7 +43,8 @@ void setup()
 
   // Present all sensors to controller
   for (int i=0; i<numSensors && i<MAX_ATTACHED_DS18B20; i++) {   
-     gw.present(i, S_THERMOMETER);
+    gw.present(i, DEV_THERMOMETER);
+     
   }
 }
 
@@ -58,9 +65,10 @@ void loop()
  
     // Only send data if temperature has changed and no error
     if (lastTemperature[i] != temperature && temperature != -127.00) {
- 
+      msg.device = i; 
+      msg.set(temperature,1);
       // Send in the new temperature
-      gw.send(msg.setSensor(i).set(temperature,1));
+      gw.send(msg);
       lastTemperature[i]=temperature;
     }
   }

@@ -50,7 +50,7 @@ bool MyDriverNRF24::send(uint8_t to, const void* data, uint8_t len) {
 
 bool MyDriverNRF24::available(uint8_t *to) {
 	uint8_t pipe = 255;
-	boolean avail = rf24->available(&pipe); 
+	bool avail = rf24->available(&pipe);
 	if (pipe == CURRENT_NODE_PIPE)
 		*to = _address;
 	else if (pipe == BROADCAST_PIPE)
@@ -61,6 +61,7 @@ bool MyDriverNRF24::available(uint8_t *to) {
 uint8_t MyDriverNRF24::receive(void* data) {
 	uint8_t len = rf24->getDynamicPayloadSize();
 	rf24->read(data, len);
+	return len;
 }
 
 void MyDriverNRF24::powerDown() {

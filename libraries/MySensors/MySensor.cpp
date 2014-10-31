@@ -33,9 +33,9 @@ static inline bool isValidDistance( const uint8_t distance ) {
 	return distance != DISTANCE_INVALID;
 }
 
-	MySensor::MySensor() {
-		driver = (MyDriver*) new MyDriverClass();
-	}
+MySensor::MySensor() {
+	driver = (MyDriver*) new MyDriverClass();
+}
 
 
 void MySensor::begin(void (*_msgCallback)(const MyMessage &), uint8_t _nodeId, boolean _repeaterMode, uint8_t _parentNodeId) {
