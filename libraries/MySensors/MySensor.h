@@ -248,7 +248,7 @@ class MySensor
 	
 	void setupRepeaterMode();
 	void setupRadio();
-	boolean sendWrite(uint8_t dest, MyMessage &message, const bool allowFindParent = true );
+	bool sendWrite(uint8_t dest, MyMessage &message, const bool allowFindParent = true );
 
   private:
 #ifdef DEBUG
