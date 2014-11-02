@@ -573,9 +573,7 @@ struct MySensorDynamicPayload : MyMessage {
 
 
 struct MsgDeviceDynamic : MySensorDynamicPayload, MsgDevice {
-
 	MsgDeviceDynamic(uint8_t deviceId = 0, uint8_t destination = 0)  : MySensorDynamicPayload(destination), MsgDevice(deviceId) {
-		this->deviceId = deviceId;
 	}
 };
 
@@ -598,15 +596,11 @@ struct MsgDeviceRate : MsgDeviceDynamic {
 };
 
 
-struct MsgParamDynamic : MySensorDynamicPayload {
-	/// Id of device that this message concerns.
-	uint8_t deviceId;
-
+struct MsgParamDynamic : MySensorDynamicPayload, MsgDevice {
 	/// Id of config or var param to set or get
 	uint8_t param;
 
-	MsgParamDynamic(uint8_t deviceId = 0, uint8_t destination = 0) : MySensorDynamicPayload(destination) {
-		this->deviceId = deviceId;
+	MsgParamDynamic(uint8_t deviceId = 0, uint8_t destination = 0) : MySensorDynamicPayload(destination), MsgDevice(deviceId) {
 	}
 };
 
@@ -689,9 +683,7 @@ struct MsgNode : MyMessage {
 	}
 };
 
-struct MsgPresentation : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t deviceId;
+struct MsgPresentation : MyMessage, MsgDevice {
 	/// The type of device. See table above.
 	MySensorDeviceType type;
 	/// Indicatior if this sensor will report as a security sensor
@@ -702,7 +694,7 @@ struct MsgPresentation : MyMessage {
 	/// 0=uncalibrated, 1=calibrated
 	uint8_t calibrated;
 
-	MsgPresentation(uint8_t destination = 0) : MyMessage(destination) {
+	MsgPresentation(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_PRESENTATION;
 	}
 };
