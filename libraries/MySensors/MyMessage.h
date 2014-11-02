@@ -112,9 +112,9 @@ typedef enum {
 	MSG_RESET,
 
 
-	///
-	/// Below follows device related messages
-	///
+	/**
+	 * Below follows device related messages
+	 */
 
 	/// Send RGB(W) value for led light
 	MSG_DEV_RGB,
@@ -454,7 +454,7 @@ typedef uint8_t MySensorPayloadDataType;
 */
 
 
-struct NetworkHeader {
+struct MyNetworkHeader {
 	/// Id of last node this message passed
 	uint8_t last;
 
@@ -465,30 +465,57 @@ struct NetworkHeader {
 	uint8_t destination;
 
 	///   0: Request an ack - Indicator that receiver should send an ack back.
-	///		 These messages should be replied with the same message/payload and the IsAckMessage bit set.
+	///		 These messages is acked automatically by MySensors::process().
 	///   1: Is ack messsage - Indicator that this is an ack message.
-	///   2: Indication if this is a request message (e.g. request config from controller or data from node)
-	///		 They should be replied with the actual value
+	///   2: Is request message. Indication if this is a request message (e.g. request config from controller or data from node)
+	///		 They should be replied to with the actual value
 	/// 3-7: Reserved
 	uint8_t flags;
 
 	/// Message type
 	MySensorMessageTypes type;
-} NetworkHeader;
+
+
+};
 
 
 
-struct MyMessage : NetworkHeader {
-	/// Used to store dynamic messages length
+struct MyMessage : MyNetworkHeader {
+	/// Used to store dynamic messages length. Makes things easier when calculating total length for transmission.
 	uint8_t length;
 
-//	virtual ~MyMessage() {}
+	MyMessage(uint8_t destination = 0) : MyNetworkHeader() {
+		this->destination = destination;
+	}
+
+	/**
+	 * Getter for the is-ack-flag.
+	 *
+	 * 	@return True if this is an ack message.
+	 */
+	bool isAck() const;
+
+	/**
+	 * Getter for the is-request-flag. This could be a request from some other node or controller to inform
+	 * sensor to report a value.
+	 *
+	 * 	@return True if this is a request message.
+	 */
+	bool isReq() const;
+
+	MyMessage& setDestination(uint8_t destination) {
+		this->destination = destination;
+		return *this;
+	}
+
+	/// Helper for setting device id "on the fly" when calling MySensors::send()
+	//	virtual ~MyMessage() {}
 //	virtual MyMessage fromJson(Parser::JsonObject json) = 0;
 //	virtual Generator::JsonObject toJson() = 0;
 };
 
 
-struct MySesnorsDynamicPayload : MyMessage {
+struct MySensorDynamicPayload : MyMessage {
 	/// Payload data type
 	MySensorPayloadDataType ptype;
 
@@ -508,6 +535,29 @@ struct MySesnorsDynamicPayload : MyMessage {
 		char data[MAX_PAYLOAD + 1];
 	} __attribute__((packed));
 
+
+	MySensorDynamicPayload(uint8_t destination = 0) : MyMessage(destination) {
+
+	}
+
+	char i2h(uint8_t i) const;
+
+	// If payload is something else than P_STRING you can have the payload value converted
+	// into string representation by supplying a buffer with the minimum size of
+	// 2*MAX_PAYLOAD+1. This is to be able to fit hex-conversion of a full binary payload.
+	char* getStream(char *buffer) const;
+	char* getString(char *buffer) const;
+	const char* getString() const;
+	void* getCustom() const;
+	uint8_t getByte() const;
+	bool getBool() const;
+	float getFloat() const;
+	long getLong() const;
+	unsigned long getULong() const;
+	int getInt() const;
+	unsigned int getUInt() const;
+
+
 	// Setters for payload
 	MyMessage& set(void* payload, uint8_t length);
 	MyMessage& set(const char* value);
@@ -520,50 +570,55 @@ struct MySesnorsDynamicPayload : MyMessage {
 };
 
 
-struct MsgDeviceDynamic : MySesnorsDynamicPayload {
-	/// Id of device that this message concerns.
-	uint8_t device;
-};
 
-struct  MsgParamDynamic : MySesnorsDynamicPayload {
-	/// Id of device that this message concerns.
-	uint8_t device;
 
-	/// Id of config or var param to set or get
-	uint8_t param;
+struct MsgDeviceDynamic : MySensorDynamicPayload, MsgDevice {
+
+	MsgDeviceDynamic(uint8_t deviceId = 0, uint8_t destination = 0)  : MySensorDynamicPayload(destination), MsgDevice(deviceId) {
+		this->deviceId = deviceId;
+	}
 };
 
 struct MsgDeviceLevel : MsgDeviceDynamic {
-
-	MsgDeviceLevel() {
+	MsgDeviceLevel(uint8_t deviceId = 0, uint8_t destination = 0) : MsgDeviceDynamic(deviceId, destination) {
 		type = MSG_DEV_LEVEL;
 	}
 };
 
 struct MsgDeviceAccumulated : MsgDeviceDynamic {
-
-	MsgDeviceAccumulated() {
+	MsgDeviceAccumulated(uint8_t deviceId = 0, uint8_t destination = 0) : MsgDeviceDynamic(deviceId, destination) {
 		type = MSG_DEV_ACCUMULATED;
 	}
 };
 
 struct MsgDeviceRate : MsgDeviceDynamic {
-
-	MsgDeviceRate() {
+	MsgDeviceRate(uint8_t deviceId = 0, uint8_t destination = 0) : MsgDeviceDynamic(deviceId, destination) {
 		type = MSG_DEV_RATE;
 	}
 };
 
-struct MsgDeviceVar : MsgParamDynamic {
 
-	MsgDeviceVar() {
+struct MsgParamDynamic : MySensorDynamicPayload {
+	/// Id of device that this message concerns.
+	uint8_t deviceId;
+
+	/// Id of config or var param to set or get
+	uint8_t param;
+
+	MsgParamDynamic(uint8_t deviceId = 0, uint8_t destination = 0) : MySensorDynamicPayload(destination) {
+		this->deviceId = deviceId;
+	}
+};
+
+
+struct MsgDeviceVar : MsgParamDynamic {
+	MsgDeviceVar(uint8_t deviceId = 0, uint8_t destination = 0) : MsgParamDynamic(deviceId, destination) {
 		type = MSG_DEV_VAR;
 	}
 };
 
 struct MsgDeviceConfig : MsgParamDynamic {
-
-	MsgDeviceConfig() {
+	MsgDeviceConfig(uint8_t deviceId = 0, uint8_t destination = 0) : MsgParamDynamic(deviceId, destination) {
 		type = MSG_DEV_CONFIG;
 	}
 };
@@ -572,7 +627,7 @@ struct MsgDeviceConfig : MsgParamDynamic {
 struct MsgFirmwareConfigRequest : MyMessage {
 	uint8_t version;
 
-	MsgFirmwareConfigRequest() {
+	MsgFirmwareConfigRequest(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_FIRMWARE_CONFIG_REQUEST;
 	}
 
@@ -597,7 +652,7 @@ struct MsgFirmwareConfigResponse : MyMessage {
 	uint16_t blocks;
 	uint16_t crc;
 
-	MsgFirmwareConfigResponse() {
+	MsgFirmwareConfigResponse(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_FIRMWARE_CONFIG_RESPONSE;
 	}
 };
@@ -606,7 +661,7 @@ struct MsgFirmwareRequest : MyMessage {
 	uint8_t version;
 	uint16_t block;
 
-	MsgFirmwareRequest() {
+	MsgFirmwareRequest(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_FIRMWARE_REQUEST;
 	}
 };
@@ -616,7 +671,7 @@ struct MsgFirmwareResponse : MyMessage {
 	uint16_t block;
 	uint8_t data[FIRMWARE_BLOCK_SIZE];
 
-	MsgFirmwareResponse() {
+	MsgFirmwareResponse(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_FIRMWARE_RESPONSE;
 	}
 };
@@ -629,14 +684,14 @@ struct MsgNode : MyMessage {
 	/// Parent node
 	uint8_t parent;
 
-	MsgNode() {
+	MsgNode(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_NODE;
 	}
 };
 
 struct MsgPresentation : MyMessage {
 	/// Id of device that this message concerns.
-	uint8_t device;
+	uint8_t deviceId;
 	/// The type of device. See table above.
 	MySensorDeviceType type;
 	/// Indicatior if this sensor will report as a security sensor
@@ -647,15 +702,25 @@ struct MsgPresentation : MyMessage {
 	/// 0=uncalibrated, 1=calibrated
 	uint8_t calibrated;
 
-	MsgPresentation() {
+	MsgPresentation(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_PRESENTATION;
 	}
 };
 
+struct MsgDevice {
+	/// Id of device that this message concerns.
+	uint8_t deviceId;
+
+	MsgDevice(uint8_t deviceId) {
+		this->deviceId = deviceId;
+	}
+};
+
+
 struct MsgVersion : MyMessage {
 	uint8_t version[MAX_PAYLOAD+1];
 
-	MsgVersion() {
+	MsgVersion(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_VERSION;
 	}
 };
@@ -663,7 +728,7 @@ struct MsgVersion : MyMessage {
 struct MsgName : MyMessage {
 	uint8_t name[MAX_PAYLOAD+1];
 
-	MsgName() {
+	MsgName(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_NAME;
 	}
 };
@@ -671,7 +736,7 @@ struct MsgName : MyMessage {
 struct MsgIdRequest : MyMessage {
 	uint16_t requestIdentifier;
 
-	MsgIdRequest() {
+	MsgIdRequest(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_ID_REQUEST;
 	}
 };
@@ -680,15 +745,14 @@ struct MsgIdResponse : MyMessage {
 	uint16_t requestIdentifier;
 	uint8_t newId;
 
-	MsgIdResponse() {
+	MsgIdResponse(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_ID_RESPONSE;
 	}
 };
 
 
 struct MsgFindParentRequest : MyMessage  {
-
-	MsgFindParentRequest() {
+	MsgFindParentRequest(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_FIND_PARENT_REQUEST;
 	}
 };
@@ -696,7 +760,7 @@ struct MsgFindParentRequest : MyMessage  {
 struct MsgFindParentResponse : MyMessage  {
 	uint8_t distance;
 
-	MsgFindParentResponse() {
+	MsgFindParentResponse(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_FIND_PARENT_RESPONSE;
 	}
 };
@@ -705,7 +769,7 @@ struct MsgFindParentResponse : MyMessage  {
 struct MsgLogMessage : MyMessage {
 	uint8_t message[MAX_PAYLOAD+1];
 
-	MsgLogMessage() {
+	MsgLogMessage(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_LOG_MESSAGE;
 	}
 };
@@ -713,14 +777,14 @@ struct MsgLogMessage : MyMessage {
 struct MsgBatteryLevel : MyMessage {
 	uint8_t level;
 
-	MsgBatteryLevel() {
+	MsgBatteryLevel(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_BATTERY_LEVEL;
 	}
 };
 
 struct MsgTimeRequest : MyMessage  {
 
-	MsgTimeRequest() {
+	MsgTimeRequest(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_TIME_REQUEST;
 	}
 };
@@ -728,173 +792,147 @@ struct MsgTimeRequest : MyMessage  {
 struct MsgTimeResponse : MyMessage  {
 	uint32_t time;
 
-	MsgTimeResponse() {
+	MsgTimeResponse(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_TIME_RESPONSE;
 	}
 };
 
 struct MsgReset : MyMessage  {
 
-	MsgReset() {
+	MsgReset(uint8_t destination = 0) : MyMessage(destination) {
 		type = MSG_RESET;
 	}
 };
 
-struct MsgDeviceRGB : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+
+struct MsgDeviceRGB : MyMessage, MsgDevice {
 	/// Red, Green and Blue component value 0-255.
 	uint8_t r;
 	uint8_t g;
 	uint8_t b;
 
-	MsgDeviceRGB() {
+	MsgDeviceRGB(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_RGB;
 	}
 };
 
-struct MsgDeviceRGBW : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+struct MsgDeviceRGBW : MyMessage, MsgDevice {
 	/// Red, Green, Blue and white component value 0-255.
 	uint8_t r;
 	uint8_t g;
 	uint8_t b;
 	uint8_t w;
 
-	MsgDeviceRGBW() {
+	MsgDeviceRGBW(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_RGBW;
 	}
 };
 
-struct MsgDeviceScene : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+struct MsgDeviceScene : MyMessage, MsgDevice {
 	/// Scene number 0-255
 	uint8_t scene;
 	/// Status ON(1) or OFF(0)
 	uint8_t status;
 
-	MsgDeviceScene() {
+	MsgDeviceScene(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_SCENE;
 	}
 };
 
-struct MsgDeviceTripped : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+struct MsgDeviceTripped : MyMessage, MsgDevice {
 	/// TRIPPED, UNTRIPPED
 	uint8_t status;
 
-	MsgDeviceTripped() {
+	MsgDeviceTripped(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_TRIPPED;
 	}
 };
 
-struct MsgDeviceArmed : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+struct MsgDeviceArmed : MyMessage, MsgDevice {
 	///  ARMED, DISARMED,
 	uint8_t armed;
 
-	MsgDeviceArmed() {
+	MsgDeviceArmed(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_ARMED;
 	}
 };
 
-struct MsgDeviceStatus : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+struct MsgDeviceStatus : MyMessage, MsgDevice {
 	/// Status ON, OFF
 	uint8_t status;
 
-	MsgDeviceStatus() {
+	MsgDeviceStatus(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_STATUS;
 	}
 };
 
-struct MsgDeviceLocked : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+struct MsgDeviceLocked : MyMessage, MsgDevice {
 	/// Status LOCKED, UNLOCKED or LOCK, UNLOCK
 	uint8_t status;
 
-	MsgDeviceLocked() {
+	MsgDeviceLocked(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_LOCKED;
 	}
 };
 
-struct MsgDeviceStop : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
-
-	MsgDeviceStop() {
+struct MsgDeviceStop : MyMessage, MsgDevice {
+	MsgDeviceStop(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_STOP;
 	}
 };
 
-struct MsgDeviceMode : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+struct MsgDeviceMode : MyMessage, MsgDevice {
 	/// The mode this device should run in .
 	uint8_t mode;
 
-	MsgDeviceMode() {
+	MsgDeviceMode(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_MODE;
 	}
 };
 
-struct MsgDeviceAngle : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+struct MsgDeviceAngle : MyMessage, MsgDevice {
 	/// Angle in degrees from true north 0-360 .
 	uint16_t angle;
 
-	MsgDeviceAngle() {
+	MsgDeviceAngle(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_ANGLE;
 	}
 };
 
-struct MsgDevicePower : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+struct MsgDevicePower : MyMessage, MsgDevice {
 	/// Current watt value
 	uint8_t watt;
 	/// The Accumulated kwh
 	uint8_t kwh;
 
-	MsgDevicePower() {
+	MsgDevicePower(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_POWER;
 	}
 };
 
-typedef struct MsgDevicePercentage : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+typedef struct MsgDevicePercentage : MyMessage, MsgDevice {
 	/// A Pecentage value between 0-100%
 	uint8_t percentage;
 
-	MsgDevicePercentage() {
+	MsgDevicePercentage(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_PERCENTAGE;
 	}
 };
 
 
-struct MsgDeviceIrSend : MyMessage {
-	/// Id of device that this message concerns.
-	uint8_t device;
+struct MsgDeviceIrSend : MyMessage, MsgDevice {
 	/// For now we have to send predefined ir messages in the node. Just select which code to send or has been received.
 	uint16_t code;
 
-	MsgDeviceIrSend() {
+	MsgDeviceIrSend(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 		type = MSG_DEV_IR_SEND;
 	}
 };
 
 
-struct MsgDeviceIrReceived : MsgDeviceIrSend {
+struct MsgDeviceIrReceived : MyMessage, MsgDevice {
 
-	MsgDeviceIrReceived() {
+	MsgDeviceIrReceived(uint8_t deviceId, uint8_t destination = 0) : MyMessage(destination), MsgDevice(deviceId) {
 			type = MSG_DEV_IR_RECEIVED;
 	}
 };
@@ -914,40 +952,8 @@ public:
 
 	MyMessage(uint8_t device, uint8_t type);
 
-	char i2h(uint8_t i) const;
 
-	// If payload is something else than P_STRING you can have the payload value converted
-	// into string representation by supplying a buffer with the minimum size of
-	// 2*MAX_PAYLOAD+1. This is to be able to fit hex-conversion of a full binary payload.
-	char* getStream(char *buffer) const;
-	char* getString(char *buffer) const;
-	const char* getString() const;
-	void* getCustom() const;
-	uint8_t getByte() const;
-	bool getBool() const;
-	float getFloat() const;
-	long getLong() const;
-	unsigned long getULong() const;
-	int getInt() const;
-	unsigned int getUInt() const;
 
-	// Getter for ack-flag. True if this is an ack message.
-	bool isAck() const;
-
-	// Setters for building message "on the fly"
-	MyMessage& setType(uint8_t type);
-	MyMessage& setDevice(uint8_t device);
-	MyMessage& setDestination(uint8_t destination);
-
-	// Setters for payload
-	MyMessage& set(void* payload, uint8_t length);
-	MyMessage& set(const char* value);
-	MyMessage& set(uint8_t value);
-	MyMessage& set(float value, uint8_t decimals);
-	MyMessage& set(unsigned long value);
-	MyMessage& set(long value);
-	MyMessage& set(unsigned int value);
-	MyMessage& set(int value);
 
 
 
