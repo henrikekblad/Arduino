@@ -238,7 +238,6 @@ class MySensor
 	bool isGateway;
 	uint16_t requestIdentifier; // Used while fetching id from controller to distinguish requests
 	MyMessage msg;  // Buffer for incoming messages.
-	//uint8_t payload[MAX_PAYLOAD_SIZE];
 	MyMessage ack;  // Buffer for ack messages.
 	MyDriver *driver;
 	

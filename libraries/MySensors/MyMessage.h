@@ -207,7 +207,7 @@ typedef enum {
 	/// MsgDeviceArmed
 	DEV_MOTION,
 
-	/// Smoke sensor
+	/// Smoke or fire sensor
 	/// MsgDeviceTripped
 	/// MsgDeviceArmed
 	DEV_SMOKE,
@@ -261,7 +261,7 @@ typedef enum {
 	/// MsgDevicePower
 	DEV_RGBW,
 
-	/// Window covers or shades
+	/// Window covers or shades (actuaror)
 	/// MsgDeviceState - 0 close, 1 open
 	/// MsgDevicePercentage - 0 closed - 100 fully open
 	/// MsgDeviceStop - stops blinds or window cover in the middle of motion.
@@ -622,7 +622,7 @@ struct MsgDeviceRGB : MyPayload {
 	uint8_t g;
 	uint8_t b;
 
-	MsgDeviceRGB(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceRGB(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(3); }
 	MySensorDeviceType getMessageType() { return MSG_DEV_RGB; }
 };
 
@@ -633,7 +633,7 @@ struct MsgDeviceRGBW : MyPayload {
 	uint8_t b;
 	uint8_t w;
 
-	MsgDeviceRGBW(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceRGBW(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(4); }
 	MySensorDeviceType getMessageType() { return MSG_DEV_RGBW; }
 };
 
@@ -643,7 +643,7 @@ struct MsgDeviceScene :  MyPayload {
 	/// Status ON(1) or OFF(0)
 	uint8_t status;
 
-	MsgDeviceScene(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceScene(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(2);}
 	MySensorDeviceType getMessageType() { return MSG_DEV_SCENE; }
 };
 
@@ -651,7 +651,7 @@ struct MsgDeviceTripped : MyPayload {
 	/// TRIPPED, UNTRIPPED
 	uint8_t status;
 
-	MsgDeviceTripped(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceTripped(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(1); }
 	MySensorDeviceType getMessageType() { return MSG_DEV_TRIPPED; }
 };
 
@@ -659,7 +659,7 @@ struct MsgDeviceArmed : MyPayload {
 	///  ARMED, DISARMED,
 	uint8_t armed;
 
-	MsgDeviceArmed(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceArmed(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(1); }
 	MySensorDeviceType getMessageType() { return MSG_DEV_ARMED; }
 };
 
@@ -667,7 +667,7 @@ struct MsgDeviceStatus : MyPayload {
 	/// Status ON, OFF
 	uint8_t status;
 
-	MsgDeviceStatus(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceStatus(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(1); }
 	MySensorDeviceType getMessageType() { return MSG_DEV_STATUS; }
 };
 
@@ -675,12 +675,12 @@ struct MsgDeviceLocked : MyPayload {
 	/// Status LOCKED, UNLOCKED or LOCK, UNLOCK
 	uint8_t status;
 
-	MsgDeviceLocked(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceLocked(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(1); }
 	MySensorDeviceType getMessageType() { return MSG_DEV_LOCKED; }
 };
 
 struct MsgDeviceStop : MyPayload{
-	MsgDeviceStop(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceStop(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(0); }
 	MySensorDeviceType getMessageType() { return MSG_DEV_STOP; }
 };
 
@@ -688,7 +688,7 @@ struct MsgDeviceMode : MyPayload{
 	/// The mode this device should run in .
 	uint8_t mode;
 
-	MsgDeviceMode(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceMode(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(1); }
 	MySensorDeviceType getMessageType() { return MSG_DEV_MODE; }
 };
 
@@ -696,7 +696,7 @@ struct MsgDeviceAngle : MyPayload {
 	/// Angle in degrees from true north 0-360 .
 	uint16_t angle;
 
-	MsgDeviceAngle(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceAngle(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(2); }
 	MySensorDeviceType getMessageType() { return MSG_DEV_ANGLE; }
 };
 
@@ -706,7 +706,7 @@ struct MsgDevicePower : MyPayload{
 	/// The Accumulated kwh
 	uint8_t kwh;
 
-	MsgDevicePower(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDevicePower(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(2);}
 	MySensorDeviceType getMessageType() { return MSG_DEV_POWER; }
 };
 
@@ -714,7 +714,7 @@ typedef struct MsgDevicePercentage : MyPayload {
 	/// A Pecentage value between 0-100%
 	uint8_t percentage;
 
-	MsgDevicePercentage(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDevicePercentage(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(1);}
 	MySensorDeviceType getMessageType() { return MSG_DEV_PERCENTAGE; }
 };
 
@@ -723,7 +723,7 @@ struct MsgDeviceIrSend : MyPayload {
 	/// For now we have to send predefined ir messages in the node. Just select which code to send or has been received.
 	uint16_t code;
 
-	MsgDeviceIrSend(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceIrSend(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(2);}
 	MySensorDeviceType getMessageType() { return MSG_DEV_IR_SEND; }
 };
 
@@ -732,7 +732,7 @@ struct MsgDeviceIrReceived : MyPayload {
 	/// For now we have to send predefined ir messages in the node. Just select which code to send or has been received.
 	uint16_t code;
 
-	MsgDeviceIrReceived(uint8_t deviceId = 0) : MyPayload(deviceId) { }
+	MsgDeviceIrReceived(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(2);}
 	MySensorDeviceType getMessageType() { return MSG_DEV_IR_RECEIVED; }
 };
 
