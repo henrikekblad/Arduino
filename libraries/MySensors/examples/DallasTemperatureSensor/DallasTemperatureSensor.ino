@@ -3,8 +3,7 @@
 #include <SPI.h>
 #include <DallasTemperature.h>
 #include <OneWire.h>
-#include <JsonGenerator.h>
-#include <JsonParser.h>
+#include <ArduinoJson.h>
 
 #ifndef MYSENSORS_SENSOR
 #error Please switch to MYSENSORS_SENSOR in MyConfig.h
@@ -18,8 +17,6 @@ DallasTemperature sensors(&oneWire);
 MySensor gw;
 float lastTemperature[MAX_ATTACHED_DS18B20];
 int numSensors=0;
-boolean receivedConfig = false;
-boolean metric = true; 
 // Initialize temperature message
 MsgDeviceLevel msg;
 
@@ -61,14 +58,13 @@ void loop()
   for (int i=0; i<numSensors && i<MAX_ATTACHED_DS18B20; i++) {
  
     // Fetch and round temperature to one decimal
-    float temperature = static_cast<float>(static_cast<int>((gw.getConfig().isMetric?sensors.getTempCByIndex(i):sensors.getTempFByIndex(i)) * 10.)) / 10.;
+    float temperature = static_cast<float>(static_cast<int>(sensors.getTempCByIndex(i)) * 10.) / 10.;
  
     // Only send data if temperature has changed and no error
     if (lastTemperature[i] != temperature && temperature != -127.00) {
-      msg.device = i; 
       msg.set(temperature,1);
       // Send in the new temperature
-      gw.send(msg);
+      gw.send(msg, i);
       lastTemperature[i]=temperature;
     }
   }

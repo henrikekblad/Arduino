@@ -6,6 +6,7 @@
 #ifndef Version_h
 #define Version_h
 
-#define LIBRARY_VERSION "1.4"
+#define MAJOR_VERSION 2
+#define MINOR_VERSION 0
 
 #endif

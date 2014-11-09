@@ -14,17 +14,32 @@
 #define DISTANCE_INVALID (0xFF)
 
 
-// Inline function and macros
-static inline MyMessage& build (MyMessage &msg, uint8_t sender, uint8_t destination, uint8_t sensor, uint8_t command, uint8_t type, bool enableAck) {
-	msg.sender = sender;
-	msg.destination = destination;
-	msg.sensor = sensor;
-	msg.type = type;
-	mSetCommand(msg,command);
-	mSetRequestAck(msg,enableAck);
-	mSetAck(msg,false);
-	return msg;
+// Inlined helper functions
+
+// Route device messages
+static inline bool route(MySensor &ms, MyMessage msg, const uint8_t deviceId, const uint8_t *payload, const MySensorMessageType deviceType, const bool requestAck, const bool isAck, const bool requestData, const uint8_t destination) {
+	msg.header.type = deviceType;
+	msg.header.sender = ms.getNodeId();
+    msg.header.setReqAck(requestAck);
+	msg.header.setAck(isAck);
+	msg.header.destination = destination;
+	memcpy(msg.payload, payload, ((MyPayload)payload).getLength() + sizeof(MyPayload));
+	((MyPayload)msg.payload).setRequest(requestData);
+	((MyPayload)msg.payload).deviceId = deviceId;
+	return ms.sendRoute(msg, sizeof(MyNetworkHeader) + ((MyPayload)payload).getLength() + sizeof(MyPayload) );
 }
+
+// Route internal messages
+static inline bool route(MySensor &ms, MyMessage msg, const uint8_t *payload, const uint8_t length, const uint8_t type, const bool requestAck, const bool isAck, const uint8_t destination) {
+	msg.header.type = type;
+	msg.header.sender = ms.getNodeId();
+    msg.header.setReqAck(requestAck);
+	msg.header.setAck(isAck);
+	msg.header.destination = destination;
+	memcpy (msg.payload,payload,length);
+	return ms.sendRoute(msg, sizeof(MyNetworkHeader) + length);
+}
+
 
 static inline bool isValidParent( const uint8_t parent ) {
 	return parent != AUTO;
@@ -33,12 +48,12 @@ static inline bool isValidDistance( const uint8_t distance ) {
 	return distance != DISTANCE_INVALID;
 }
 
+
 MySensor::MySensor() {
 	driver = (MyDriver*) new MyDriverClass();
 }
 
-
-void MySensor::begin(void (*_msgCallback)(const MyMessage &), uint8_t _nodeId, boolean _repeaterMode, uint8_t _parentNodeId) {
+void MySensor::begin(void (*_msgCallback)(const MyMessage &), uint8_t _nodeId, bool _repeaterMode, uint8_t _parentNodeId) {
 	Serial.begin(BAUD_RATE);
 	repeaterMode = _repeaterMode;
 	msgCallback = _msgCallback;
@@ -47,22 +62,18 @@ void MySensor::begin(void (*_msgCallback)(const MyMessage &), uint8_t _nodeId, b
 	isGateway = _nodeId == 0;
 
 	if (repeaterMode) {
-		setupRepeaterMode();
+		childNodeTable = new uint8_t[256];
+		eeprom_read_block((void*)childNodeTable, (void*)EEPROM_ROUTES_ADDRESS, 256);
 	}
-	setupRadio();
+
+	failedTransmissions = 0;
+	driver->init();
 
 	// Read settings from EEPROM
 	eeprom_read_block((void*)&nc, (void*)EEPROM_NODE_ID_ADDRESS, sizeof(NodeConfig));
-	// Read latest received controller configuration from EEPROM
-	eeprom_read_block((void*)&cc, (void*)EEPROM_CONTROLLER_CONFIG_ADDRESS, sizeof(ControllerConfig));
 
 	if (isGateway) {
 		nc.distance = 0;
-	}
-
-	if (cc.isMetric == 0xff) {
-		// Eeprom empty, set default to metric
-		cc.isMetric = 0x01;
 	}
 
 	autoFindParent = _parentNodeId == AUTO;
@@ -91,41 +102,29 @@ void MySensor::begin(void (*_msgCallback)(const MyMessage &), uint8_t _nodeId, b
 	// Open reading pipe for messages directed to this node (set write pipe to same)
 	driver->setAddress(nc.nodeId);
 
-	// Send presentation for this radio node (attach
-	present(NODE_SENSOR_ID, repeaterMode? S_ARDUINO_REPEATER_NODE : S_ARDUINO_NODE);
-
-	// Send a configuration exchange request to controller
-	// Node sends parent node. Controller answers with latest node configuration
-	// which is picked up in process()
-	sendRoute(build(msg, nc.nodeId, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_INTERNAL, I_CONFIG, false).set(nc.parentNodeId));
+	// Send node presentation to controller.
+	((MsgNode)payload).isRepeater = repeaterMode;
+	((MsgNode)payload).majorVersion = MAJOR_VERSION;
+	((MsgNode)payload).minorVersion = MINOR_VERSION;
+	((MsgNode)payload).parent = nc.parentNodeId;
+	route(*this, msg, payload, sizeof(MsgNode), MSG_NODE, false, false, GATEWAY_ADDRESS);
 
 	// Wait configuration reply.
 	waitForReply();
 }
 
-void MySensor::setupRadio() {
-	failedTransmissions = 0;
-	driver->init();
-}
-
-void MySensor::setupRepeaterMode(){
-	childNodeTable = new uint8_t[256];
-	eeprom_read_block((void*)childNodeTable, (void*)EEPROM_ROUTES_ADDRESS, 256);
-}
 
 
 uint8_t MySensor::getNodeId() {
 	return nc.nodeId;
 }
 
-ControllerConfig MySensor::getConfig() {
-	return cc;
-}
 
 void MySensor::requestNodeId() {
 	debug(PSTR("req node id\n"));
 	driver->setAddress(nc.nodeId);
-	sendRoute(build(msg, nc.nodeId, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_INTERNAL, I_ID_REQUEST, false).set(""));
+	((MsgIdRequest)msg).requestIdentifier = requestIdentifier = (uint16_t) micros(); // generate "random" number. Trucate high bits.
+	route(*this, msg, payload, MSG_ID_REQUEST, sizeof(MsgIdRequest), false, false, GATEWAY_ADDRESS);
 	waitForReply();
 }
 
@@ -133,57 +132,49 @@ void MySensor::requestNodeId() {
 void MySensor::findParentNode() {
 	// Send ping message to BROADCAST_ADDRESS (to which all relaying nodes and gateway listens and should reply to)
 	debug(PSTR("find parent\n"));
-
-	build(msg, nc.nodeId, BROADCAST_ADDRESS, NODE_SENSOR_ID, C_INTERNAL, I_FIND_PARENT, false).set("");
-	// Write msg, but suppress recursive parent search
-	sendWrite(BROADCAST_ADDRESS, msg, false);
-
+	route(*this, msg, payload, MSG_FIND_PARENT_REQUEST, false, false, false, BROADCAST_ADDRESS);
 	// Wait for ping response.
 	waitForReply();
 }
 
 void MySensor::waitForReply() {
 	unsigned long enter = millis();
-	// Wait a couple of seconds for response
+	// Let's process incoming messages for a couple of seconds
 	while (millis() - enter < 2000) {
 		process();
 	}
 }
 
-boolean MySensor::sendRoute(MyMessage &message) {
-	// Make sure to process any incoming messages before sending (could this end up in recursive loop?)
-	// process();
-	bool isInternal = mGetCommand(message) == C_INTERNAL;
-
+bool MySensor::sendRoute(MyMessage &message, const uint8_t length) {
 	// If we still don't have any node id, re-request and skip this message.
-	if (nc.nodeId == AUTO && !(isInternal && message.type == I_ID_REQUEST)) {
+	if (nc.nodeId == AUTO && !(message.header.type == MSG_ID_REQUEST)) {
 		requestNodeId();
 		return false;
 	}
 
 	if (repeaterMode) {
-		uint8_t dest = message.destination;
+		uint8_t dest = message.header.destination;
 		uint8_t route = getChildRoute(dest);
 		if (route>GATEWAY_ADDRESS && route<BROADCAST_ADDRESS && dest != GATEWAY_ADDRESS) {
 			// --- debug(PSTR("route %d.\n"), route);
 			// Message destination is not gateway and is in routing table for this node.
 			// Send it downstream
-			return sendWrite(route, message);
-		} else if (isInternal && message.type == I_ID_RESPONSE && dest==BROADCAST_ADDRESS) {
+			return sendWrite(route, message, length);
+		} else if (message.header.type == MSG_ID_RESPONSE && dest==BROADCAST_ADDRESS) {
 			// Node has not yet received any id. We need to send it
 			// by doing a broadcast sending,
-			return sendWrite(BROADCAST_ADDRESS, message);
+			return sendWrite(BROADCAST_ADDRESS, message, length);
 		}
 	}
 
 	if (!isGateway) {
 		// Should be routed back to gateway.
-		return sendWrite(nc.parentNodeId, message);
+		return sendWrite(nc.parentNodeId, message, length);
 	}
 	return false;
 }
 
-boolean MySensor::sendWrite(uint8_t next, MyMessage &message, const bool allowFindParent) {
+bool MySensor::sendWrite(uint8_t next, MyMessage &message, const uint8_t length, const bool allowFindParent) {
 	bool ok = true;
 	const bool broadcast = next == BROADCAST_ADDRESS;
 	const bool toParent  = next == nc.parentNodeId;
@@ -199,14 +190,13 @@ boolean MySensor::sendWrite(uint8_t next, MyMessage &message, const bool allowFi
 	}
 
 	if (ok) {
-		uint8_t length = mGetLength(message);
-		message.last = nc.nodeId;
-		mSetVersion(message, PROTOCOL_VERSION);
-		bool ok = driver->send(next, &message, min(MAX_MESSAGE_LENGTH, HEADER_SIZE + length));
+		message.header.last = nc.nodeId;
+		bool ok = driver->send(next, &message, length);
 
-		debug(PSTR("send: %d-%d-%d-%d s=%d,c=%d,t=%d,pt=%d,l=%d,st=%s:%s\n"),
-				message.sender,message.last, next, message.destination, message.sensor, mGetCommand(message), message.type,
+/*		debug(PSTR("send: %d-%d-%d-%d s=%d,c=%d,t=%d,pt=%d,l=%d,st=%s:%s\n"),
+				message.sender,message.last, next, message.destination, message.deviceId, message.type, message.type,
 				mGetPayloadType(message), mGetLength(message), broadcast ? "bc" : (ok ? "ok":"fail"), message.getString(convBuf));
+		*/
 
 		// If many successive transmissions to parent failed, the parent node might be down and we
 		// need to find another route to gateway.
@@ -228,41 +218,53 @@ boolean MySensor::sendWrite(uint8_t next, MyMessage &message, const bool allowFi
 }
 
 
-bool MySensor::send(MyMessage &message, bool enableAck) {
-	message.sender = nc.nodeId;
-	mSetCommand(message,C_SET);
-    mSetRequestAck(message,enableAck);
-	return sendRoute(message);
+
+bool MySensor::send(const uint8_t deviceId, const MyPayload &pl, const uint8_t destination, const bool requestAck) {
+	return route(*this, msg, deviceId, (uint8_t *)&pl, pl.getDeviceType(), requestAck, false, false, destination);
 }
 
-void MySensor::sendBatteryLevel(uint8_t value, bool enableAck) {
-	sendRoute(build(msg, nc.nodeId, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_INTERNAL, I_BATTERY_LEVEL, enableAck).set(value));
+bool MySensor::request(const uint8_t deviceId, const MySensorMessageType deviceType, const uint8_t destination) {
+	// No payload for request data messages
+	((MyPayload)payload).setLength(sizeof(MyPayload));
+	return route(*this, msg, deviceId, payload, deviceType, false, false, true, destination);
 }
 
-void MySensor::present(uint8_t childSensorId, uint8_t sensorType, bool enableAck) {
-	sendRoute(build(msg, nc.nodeId, GATEWAY_ADDRESS, childSensorId, C_PRESENTATION, sensorType, enableAck).set(LIBRARY_VERSION));
+
+bool MySensor::sendBatteryLevel(uint8_t value, bool requestAck) {
+	((MsgBatteryLevel)payload).level = value;
+	return route(*this, msg, payload, sizeof(MsgBatteryLevel), MSG_BATTERY_LEVEL, requestAck, false, GATEWAY_ADDRESS);
 }
 
-void MySensor::sendSketchInfo(const char *name, const char *version, bool enableAck) {
+bool MySensor::present(uint8_t deviceId, MySensorDeviceType deviceType, bool binary, bool calibrated, bool requestAck) {
+	((MsgPresentation)payload).deviceId = deviceId;
+	((MsgPresentation)payload).deviceType = deviceType;
+	((MsgPresentation)payload).calibrated = calibrated;
+	((MsgPresentation)payload).binary = binary;
+	return route(*this, msg, payload, sizeof(MsgPresentation),  MSG_PRESENTATION, requestAck, false, GATEWAY_ADDRESS);
+}
+
+bool MySensor::sendSketchInfo(const char *name, const char *version, bool requstAck) {
+	bool ok = true;
 	if (name != NULL) {
-		sendRoute(build(msg, nc.nodeId, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_INTERNAL, I_SKETCH_NAME, enableAck).set(name));
+		((MsgName)msg).name = name;
+		ok = route(*this, msg, (uint8_t *)name, strlen(name), MSG_NAME, requstAck, false, GATEWAY_ADDRESS);
 	}
     if (version != NULL) {
-    	sendRoute(build(msg, nc.nodeId, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_INTERNAL, I_SKETCH_VERSION, enableAck).set(version));
+		((MsgVersion)msg).version = version;
+    	return ok && route(*this, msg, (uint8_t *)version, strlen(version), MSG_VERSION, requstAck, false, GATEWAY_ADDRESS);
+
     }
+    return ok;
 }
 
-void MySensor::request(uint8_t childSensorId, uint8_t variableType, uint8_t destination) {
-	sendRoute(build(msg, nc.nodeId, destination, childSensorId, C_REQ, variableType, false));
-}
 
-void MySensor::requestTime(void (* _timeCallback)(unsigned long)) {
+bool MySensor::requestTime(void (* _timeCallback)(unsigned long)) {
 	timeCallback = _timeCallback;
-	sendRoute(build(msg, nc.nodeId, GATEWAY_ADDRESS, NODE_SENSOR_ID, C_INTERNAL, I_TIME, false));
+	return route(*this, msg, payload, 0,  MSG_TIME_REQUEST, false, false, GATEWAY_ADDRESS);
 }
 
 
-boolean MySensor::process() {
+bool MySensor::process() {
 	uint8_t to = 0;
 	if (!driver->available(&to))
 		return false;
@@ -270,42 +272,42 @@ boolean MySensor::process() {
 	uint8_t len = driver->receive((uint8_t *)&msg);
 
 	// Add string termination, good if we later would want to print it.
-	msg.data[mGetLength(msg)] = '\0';
-	debug(PSTR("read: %d-%d-%d s=%d,c=%d,t=%d,pt=%d,l=%d:%s\n"),
-				msg.sender, msg.last, msg.destination,  msg.sensor, mGetCommand(msg), msg.type, mGetPayloadType(msg), mGetLength(msg), msg.getString(convBuf));
-
-	if(!(mGetVersion(msg) == PROTOCOL_VERSION)) {
+	//msg.payload[mGetLength(msg)] = '\0';
+/*	debug(PSTR("read: %d-%d-%d s=%d,c=%d,t=%d,pt=%d,l=%d:%s\n"),
+				msg.header.sender, msg.header.last, msg.header.destination,  msg.deviceId,  msg.header.type, mGetPayloadType(msg), mGetLength(msg), msg.getString(convBuf));
+*/
+	/*if(!(mGetVersion(msg) == PROTOCOL_VERSION)) {
 		debug(PSTR("version mismatch\n"));
 		return false;
-	}
+	}*/
 
-	uint8_t command = mGetCommand(msg);
-	uint8_t type = msg.type;
-	uint8_t sender = msg.sender;
-	uint8_t last = msg.last;
-	uint8_t destination = msg.destination;
+	uint8_t type = msg.header.type;
+	uint8_t sender = msg.header.sender;
+	uint8_t last = msg.header.last;
+	uint8_t destination = msg.header.destination;
 
-	if (repeaterMode && command == C_INTERNAL && type == I_FIND_PARENT) {
+	if (repeaterMode && type == MSG_FIND_PARENT_REQUEST) {
 		// Relaying nodes should always answer ping messages
 		// Wait a random delay of 0-1.023 seconds to minimize collision
 		// between ping ack messages from other relaying nodes
 		delay(millis() & 0x3ff);
-		sendWrite(sender, build(msg, nc.nodeId, sender, NODE_SENSOR_ID, C_INTERNAL, I_FIND_PARENT_RESPONSE, false).set(nc.distance));
+		((MsgFindParentResponse)payload).distance = nc.distance;
+		route(*this, msg, payload, sizeof(MsgFindParentResponse), MSG_FIND_PARENT_RESPONSE, false, false, sender);
 		return false;
-	} else if (command == C_INTERNAL && type == I_TIME) {
+	} else if (type == MSG_TIME_RESPONSE) {
 		if (timeCallback != NULL) {
 			// Deliver time to callback
-			timeCallback(msg.getULong());
+			timeCallback(((MsgTimeResponse)msg).time);
 		}
 	} else if (destination == nc.nodeId) {
 		// Check if sender requests an ack back.
-		if (mGetRequestAck(msg)) {
+		if (msg.header.isReqAck()) {
 			// Copy message
 			ack = msg;
-			mSetRequestAck(ack,false); // Reply without ack flag (otherwise we would end up in an eternal loop)
-			mSetAck(ack,true);
-			ack.sender = nc.nodeId;
-			ack.destination = msg.sender;
+			ack.header.setReqAck(false); // Reply without ack flag (otherwise we would end up in an eternal loop)
+			ack.header.setAck(true);
+			ack.header.sender = nc.nodeId;
+			ack.header.destination = msg.header.sender;
 			sendRoute(ack);
 		}
 
@@ -315,58 +317,45 @@ boolean MySensor::process() {
 			addChildRoute(sender, last);
 		}
 
-		if (command == C_INTERNAL) {
-			if (type == I_FIND_PARENT_RESPONSE && !isGateway) {
-				// We've received a reply to a FIND_PARENT message. Check if the distance is
-				// shorter than we already have.
-				uint8_t distance = msg.getByte();
-				if (isValidDistance(distance))
-				{
-					// Distance to gateway is one more for us w.r.t. parent
-					distance++;
-					if (isValidDistance(distance) && (distance < nc.distance)) {
-						// Found a neighbor closer to GW than previously found
-						nc.distance = distance;
-						nc.parentNodeId = msg.sender;
-						eeprom_write_byte((uint8_t*)EEPROM_PARENT_NODE_ID_ADDRESS, nc.parentNodeId);
-						eeprom_write_byte((uint8_t*)EEPROM_DISTANCE_ADDRESS, nc.distance);
-						debug(PSTR("new parent=%d, d=%d\n"), nc.parentNodeId, nc.distance);
-					}
+		if (type == MSG_FIND_PARENT_RESPONSE && !isGateway) {
+			// We've received a reply to a FIND_PARENT message. Check if the distance is
+			// shorter than we already have.
+			uint8_t distance = ((MsgFindParentResponse)msg).distance;
+			if (isValidDistance(distance))
+			{
+				// Distance to gateway is one more for us w.r.t. parent
+				distance++;
+				if (isValidDistance(distance) && (distance < nc.distance)) {
+					// Found a neighbor closer to GW than previously found
+					nc.distance = distance;
+					nc.parentNodeId = msg.header.sender;
+					eeprom_write_byte((uint8_t*)EEPROM_PARENT_NODE_ID_ADDRESS, nc.parentNodeId);
+					eeprom_write_byte((uint8_t*)EEPROM_DISTANCE_ADDRESS, nc.distance);
+					debug(PSTR("new parent=%d, d=%d\n"), nc.parentNodeId, nc.distance);
 				}
-				return false;
-			} else if (sender == GATEWAY_ADDRESS) {
-				bool isMetric;
-
-				if (type == I_REBOOT) {
-					// Requires MySensors or other bootloader with watchdogs enabled
-					wdt_enable(WDTO_15MS);
-					for (;;);
-				} else if (type == I_ID_RESPONSE) {
-					if (nc.nodeId == AUTO) {
-						nc.nodeId = msg.getByte();
-						// Write id to EEPROM
-						if (nc.nodeId == AUTO) {
-							// sensor net gateway will return max id if all sensor id are taken
-							debug(PSTR("full\n"));
-							while (1); // Wait here. Nothing else we can do...
-						} else {
-							driver->setAddress(nc.nodeId);
-							eeprom_write_byte((uint8_t*)EEPROM_NODE_ID_ADDRESS, nc.nodeId);
-						}
-						debug(PSTR("id=%d\n"), nc.nodeId);
-					}
-				} else if (type == I_CONFIG) {
-					// Pick up configuration from controller (currently only metric/imperial)
-					// and store it in eeprom if changed
-					isMetric = msg.getString()[0] == 'M' ;
-					if (cc.isMetric != isMetric) {
-						cc.isMetric = isMetric;
-						eeprom_write_byte((uint8_t*)EEPROM_CONTROLLER_CONFIG_ADDRESS, isMetric);
-					}
-				}
-				return false;
 			}
+			return false;
+		} else if (sender == GATEWAY_ADDRESS) {
+			if (type == MSG_RESET) {
+				// Requires MySensors or other bootloader with watchdogs enabled
+				wdt_enable(WDTO_15MS);
+				for (;;);
+			} else if (type == MSG_ID_RESPONSE && nc.nodeId == AUTO && ((MsgIdResponse)msg).requestIdentifier == requestIdentifier) {
+				nc.nodeId = ((MsgIdResponse)msg).newId;
+				// Write id to EEPROM
+				if (nc.nodeId == AUTO) {
+					// sensor net gateway will return max id if all sensor id are taken
+					debug(PSTR("full\n"));
+					while (1); // Wait here. Nothing else we can do...
+				} else {
+					driver->setAddress(nc.nodeId);
+					eeprom_write_byte((uint8_t*)EEPROM_NODE_ID_ADDRESS, nc.nodeId);
+				}
+				debug(PSTR("id=%d\n"), nc.nodeId);
+			}
+			return false;
 		}
+
 		// Call incoming message callback if available
 		if (msgCallback != NULL) {
 			msgCallback(msg);
@@ -376,7 +365,7 @@ boolean MySensor::process() {
 	} else if (repeaterMode && to == nc.nodeId) {
 		// We should try to relay this message to another node
 
-		uint8_t route = getChildRoute(msg.destination);
+		uint8_t route = getChildRoute(msg.header.destination);
 		if (route>0 && route<255) {
 			// This message should be forwarded to a child node. If we send message
 			// to this nodes pipe then all children will receive it because the are
@@ -529,8 +518,8 @@ void MySensor::debugPrint(const char *fmt, ... ) {
 	char fmtBuffer[300];
 	if (isGateway) {
 		// prepend debug message to be handled correctly by gw (C_INTERNAL, I_LOG_MESSAGE)
-		snprintf_P(fmtBuffer, 299, PSTR("0;0;%d;0;%d;"), C_INTERNAL, I_LOG_MESSAGE);
-		Serial.print(fmtBuffer);
+	//	snprintf_P(fmtBuffer, 299, PSTR("0;0;%d;0;%d;"), C_INTERNAL, I_LOG_MESSAGE);
+	//	Serial.print(fmtBuffer);
 	}
 	va_list args;
 	va_start (args, fmt );
