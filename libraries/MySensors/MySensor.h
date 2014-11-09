@@ -114,16 +114,21 @@ class MySensor
 	bool sendSketchInfo(const char *name, const char *version, bool ack=false);
 
 	/**
+	 * Sends a log message to controller (which hopefully is logged by controller).
+	 */
+	bool logMessage(const char *message, bool ack=false);
+
+	/**
 	* Sends a message to gateway or one of the other nodes in the radio network
 	*
 	* @param message Payload to send
-	* @param deviceId The device is the payload concerns.
+//	* @param deviceId The device is the payload concerns.
 	* @param payload The message payload to send.
 	* @param destination The nodeId of other node in radio network. Default is gateway
 	* @param ack Set this to true if you want destination node to send ack back to this node. Default is not to request any ack.
 	* @return true if transmission to first hop in route to gateway was sucessful
 	*/
-	bool send(const uint8_t deviceId, const MyPayload &payload, const uint8_t destination=GATEWAY_ADDRESS, const bool ack=false);
+	bool send(MyPayload &payload, const uint8_t destination=GATEWAY_ADDRESS, const bool ack=false);
 
 	bool sendRoute(MyMessage &message, const uint8_t length);
 
@@ -233,11 +238,11 @@ class MySensor
 	bool isGateway;
 	uint16_t requestIdentifier; // Used while fetching id from controller to distinguish requests
 	MyMessage msg;  // Buffer for incoming messages.
-	uint8_t payload[MAX_PAYLOAD_SIZE];
+	//uint8_t payload[MAX_PAYLOAD_SIZE];
 	MyMessage ack;  // Buffer for ack messages.
 	MyDriver *driver;
 	
-	bool sendWrite(uint8_t dest, MyMessage &message, const uint8_t length, const bool allowFindParent = true );
+	bool sendWrite(const uint8_t dest, MyMessage &message, const uint8_t length, const bool allowFindParent = true );
 	uint8_t failedTransmissions;
 	uint8_t *childNodeTable; // In memory buffer for routing information to other nodes. also stored in EEPROM
     void (*timeCallback)(unsigned long); // Callback for requested time messages

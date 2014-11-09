@@ -63,8 +63,9 @@ void loop()
     // Only send data if temperature has changed and no error
     if (lastTemperature[i] != temperature && temperature != -127.00) {
       msg.set(temperature,1);
+      msg.deviceId = i;
       // Send in the new temperature
-      gw.send(msg, i);
+      gw.send(msg);
       lastTemperature[i]=temperature;
     }
   }
