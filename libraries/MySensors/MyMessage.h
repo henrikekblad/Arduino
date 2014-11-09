@@ -235,6 +235,10 @@ typedef enum {
 	/// MsgDevicePercentage - Sketch recalculate potentiometer value to a number between 0-100
 	DEV_POTENTIOMETER_SENSOR,
 
+	/// Sprinker device.
+	/// MsgDeviceState
+	DEV_SPRINKLER,
+
 	/// Controllable acutators that not match the light device
 	/// MsgDeviceState
 	DEV_SWITCH,
