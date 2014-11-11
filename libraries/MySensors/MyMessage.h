@@ -1,12 +1,19 @@
-/*
- The MySensors library adds a new layer on top of the RF24 library.
- It handles radio network routing, relaying and ids.
-
- Created by Henrik Ekblad <henrik.ekblad@gmail.com>
-
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- version 2 as published by the Free Software Foundation.
+/**
+ * The MySensors Arduino library handles the wireless radio link and protocol
+ * between your home built sensors/actuators and HA controller of choice.
+ * The sensors forms a self healing radio network with optional repeaters. Each
+ * repeater and gateway builds a routing tables in EEPROM which keeps track of the
+ * network topology allowing messages to be routed to nodes.
+ *
+ * Created by Henrik Ekblad <henrik.ekblad@mysensors.org>
+ * Full contributor list: https://github.com/mysensors/Arduino/graphs/contributors
+ *
+ * Documentation: http://www.mysensors.org
+ * Support Forum: http://forum.mysensors.org
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation.
  */
 
 #ifndef MyMessage_h
@@ -63,8 +70,15 @@
 #define BF_SET(y, x, start, len)    ( y= ((y) &~ BF_MASK(start, len)) | BF_PREP(x, start, len) )
 
 
+/// Gateway-controller message types
+typedef enum {
+	/// Sent from gateway to controller when it's ready for action. No OTA
+	MSG_GATEWAY_READY,
+	/// Activate/deactivate inclusion mode. Used between gateway and controller. No OTA
+	MSG_INCLUSION_MODE,
+};
 
-/// Message types
+/// Over the air message types
 typedef enum {
 
 	/// Firmware OTA transmission messages.
@@ -72,11 +86,6 @@ typedef enum {
 	MSG_FIRMWARE_CONFIG_RESPONSE,
 	MSG_FIRMWARE_REQUEST,
 	MSG_FIRMWARE_RESPONSE,
-
-	/// Sent from gateway to controller when it's ready for action. No OTA
-	MSG_GATEWAY_READY,
-	/// Activate/deactivate inclusion mode. Used between gateway and controller. No OTA
-	MSG_INCLUSION_MODE,
 
 	/// Node message sent to controller when sketch calls setup()
 	/// MsgNode
@@ -124,50 +133,67 @@ typedef enum {
 
 
 	/**
-	 * Below follows device related messages
+	 * Below follows device related messages (starts with id=100)
 	 */
 
 	/// Send RGB(W) value for led light
-	MSG_DEV_RGB,
-	MSG_DEV_RGBW,
+	MSG_DEV_RGB=100,	// 3 x uint8_t
+	MSG_DEV_RGBW,		// 4 x uint8_t
 
 	/// Scene message (turns on/off a scene on controller)
-	MSG_DEV_SCENE,
+	MSG_DEV_SCENE,		// scene #, status
 
 	/// Send a binary state messages.
-	MSG_DEV_TRIPPED,
-	MSG_DEV_ARMED,
-	MSG_DEV_STATUS,
-	MSG_DEV_LOCKED,
+	MSG_DEV_TRIPPED,  	// bool
+	MSG_DEV_ARMED,		// bool
+	MSG_DEV_STATUS,		// bool
+	MSG_DEV_LOCKED,		// bool
 
-	/// Send watt and kwh
-	MSG_DEV_POWER,
+	/// Send watt and kwh for power consuming devices
+	MSG_DEV_POWER_WATT,	// uint16_t
+	MSG_DEV_POWER_KWH,	// uint32_t
 
 	// Send a percentage value for things like window cover position, dimmable light and uncalibrated light levels
-	MSG_DEV_PERCENTAGE,
+	MSG_DEV_PERCENTAGE_FLOAT,	// float (4 bytes)
+	MSG_DEV_PERCENTAGE_INT,		// unit8_t
 
 	// Send a level value from or to a device.
-	MSG_DEV_LEVEL,
+	MSG_DEV_LEVEL_FLOAT,	// float (4 bytes)
+	MSG_DEV_LEVEL_INT,		// int16_t
+	MSG_DEV_LEVEL_LONG,		// int32_t
 
 	// Send or request config parameters
-	MSG_DEV_CONFIG,
+	MSG_DEV_CONFIG_FLOAT,	// float (4 bytes)
+	MSG_DEV_CONFIG_INT,		// int16_t
+	MSG_DEV_CONFIG_LONG,	// int32_t
+	MSG_DEV_CONFIG_STRING,	// variable length
+	MSG_DEV_CONFIG_CUSTOM,	// variable length (e.g. custom structs beween sensors)
+
 	// Send or request device variables
-	MSG_DEV_VAR,
+	MSG_DEV_VAR_FLOAT,	// float (4 bytes)
+	MSG_DEV_VAR_INT,	// int16_t
+	MSG_DEV_VAR_LONG,	// int32_t
+	MSG_DEV_VAR_STRING,	// variable length
+	MSG_DEV_VAR_CUSTOM,	// variable length (e.g. custom structs beween sensors)
 
 	// Stop message which can interrupt motion of blinds or window cover
 	MSG_DEV_STOP,
 
 	// Ackumelated value for sensor e.g. rain, water meter
-	MSG_DEV_ACCUMULATED,
+	MSG_DEV_ACCUMULATED_FLOAT,	// float (4bytes)
+	MSG_DEV_ACCUMULATED_INT,	// int16_t
+	MSG_DEV_ACCUMULATED_LONG,	// int32_t
 
 	// Rate values e.g. rain
-	MSG_DEV_RATE,
+	MSG_DEV_RATE_FLOAT,	// float (4bytes)
+	MSG_DEV_RATE_INT,	// int16_t
+	MSG_DEV_RATE_LONG,	// int32_t
 
 	// Set mode for the device (different meaning for each device)
-	MSG_DEV_MODE,
+	MSG_DEV_MODE,	// unit8_t
 
 	// Angle report (e.g. compass, wind)
-	MSG_DEV_ANGLE,
+	MSG_DEV_ANGLE,	// uint16_t
 
 	// Send or received IR message
 	MSG_DEV_IR_SEND,
@@ -219,7 +245,8 @@ typedef enum {
 
 	/// Binary on/off light
 	/// MsgDeviceState
-	/// MsgDevicePower
+	/// MsgDevicePowerWatt
+	/// MsgDevicePowerKWH
 	DEV_LIGHT,
 
 	/// Binary switch sensor
@@ -228,11 +255,11 @@ typedef enum {
 
 	/// Rotary switch sensor. E.g. rotary encoder which can be turned or clicked
 	/// MsgDeviceTripped - Tripped value is send when clicking encoder (when supported)
-	/// MsgDeviceLevel
+	/// MsgDeviceLevel*
 	DEV_ROTARY_ENCODER_SENSOR,
 
 	/// Rotary potentiometer sensor. This sensor has end stops.
-	/// MsgDevicePercentage - Sketch recalculate potentiometer value to a number between 0-100
+	/// MsgDevicePercentage* - Sketch recalculate potentiometer value to a number between 0-100
 	DEV_POTENTIOMETER_SENSOR,
 
 	/// Sprinker device.
@@ -245,73 +272,77 @@ typedef enum {
 
 	/// Dimmable actuator
 	/// MsgDeviceState
-	/// MsgDevicePercentage
-	/// MsgDevicePower
+	/// MsgDevicePercentage*
+	/// MsgDevicePowerWatt
+	/// MsgDevicePowerKWH
 	DEV_DIMMABLE,
 
-	/// RGB Light (with red, green, blue component)
+	/// RGB Light (with red, green, blue component 0-255)
 	/// MsgDeviceState
 	/// MsgDeviceRGB
-	/// MsgDevicePower
+	/// MsgDevicePowerWatt
+	/// MsgDevicePowerKWH
 	DEV_RGB,
 
-	/// RGBW Light (with red, green, blue white component)
+	/// RGBW Light (with red, green, blue white component 0-255)
 	/// MsgDeviceState
 	/// MsgDeviceRGBW
-	/// MsgDevicePower
+	/// MsgDevicePowerWatt
+	/// MsgDevicePowerKWH
 	DEV_RGBW,
 
 	/// Window covers or shades (actuaror)
 	/// MsgDeviceState - 0 close, 1 open
-	/// MsgDevicePercentage - 0 closed - 100 fully open
+	/// MsgDevicePercentage* - 0 closed - 100 fully open
 	/// MsgDeviceStop - stops blinds or window cover in the middle of motion.
 	DEV_WINDOW_COVER,
 
 	/// Temperature sensor (*)
-	/// MsgDeviceLevel (N) - Current temperature level in degrees celsius <int or float>
+	/// MsgDeviceLevel* (N) - Current temperature level in degrees celsius <int or float>
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_THERMOMETER,
 
 	/// Humidity sensor (*)
-	/// MsgDevicePercentage (N)
+	/// MsgDevicePercentage* (N)
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_HUMIDITY,
 
 	/// Barometer sensor or Pressure sensor (*)
-	/// MsgDeviceLevel (N) - Pressure level in hPa
+	/// MsgDeviceLevel* (N) - Pressure level in hPa
 	/// MsgDeviceMode (N) - Whether forecast. One of 0="stable", 1="sunny", 2="cloudy", 3="unstable", 4="thunderstorm" or 5="unknown"
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_BAROMETER,
 
 	/// Wind sensor (*)
-	/// MsgDeviceLevel (N) - Wind level in m/s (average wind speed during last report period)
+	/// MsgDeviceLevel* (N) - Wind level in m/s (average wind speed during last report period)
 	/// MsgDeviceAngle (N) - degrees clockwise from true north <int>
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_WIND,
 
 	/// Rain sensor (*)
-	/// MsgDeviceAccumulated (N) - Accumulated rain in mm
-	/// MsgDeviceRate (N) - Rain rate in mm/h
+	/// MsgDeviceAccumulated* (N) - Accumulated rain in mm
+	/// MsgDeviceRate* (N) - Rain rate in mm/h
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_RAIN,
 
 	/// UV sensor (*)
-	/// MsgDeviceLevel (N) - Uv Index level (0-12)
+	/// MsgDeviceLevel* (N) - Uv Index level (0-12)
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_UV,
 
 	/// Weight sensor
-	/// MsgDeviceLevel - Weight in kg <int, float>
+	/// MsgDeviceLevel* - Weight in kg <int, float>
 	DEV_WEIGHT_SCALE,
 
 	/// Power measuring sensor (*)
-	/// MsgDevicePower (N)
+	/// MsgDevicePowerWatt (N)
+	/// MsgDevicePowerKWH (N)
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_POWER_METER,
@@ -319,29 +350,29 @@ typedef enum {
 	/// Thermostat (for controlling heater or cooler devices)
 	/// MsgDeviceState - Turn 1=On, 0=Off heater or cooler power switch.
 	/// MsgDeviceMode - Heater/AC mode. One of 0="Off", 1="HeatOn", 2="CoolOn", or 3="AutoChangeOver"
-	/// MsgDeviceLevel - Setpoint for ideal temperature in celsius degrees
+	/// MsgDeviceLevel* - Setpoint for ideal temperature in celsius degrees
 	DEV_THERMOSTAT,
 
 	/// Distance sensor (*)
-	/// MsgDeviceLevel (N) - Distance in meters <int, float>
+	/// MsgDeviceLevel* (N) - Distance in meters <int, float>
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_DISTANCE,
 
 	/// Light sensor (*)
-	/// MsgDeviceLevel (N/C) - Light level in lux
-	/// MsgDevicePercentage (N/U) - Uncalibrated light level in percentage 0-100%
+	/// MsgDeviceLevel* (N/C) - Light level in lux
+	/// MsgDevicePercentage* (N/U) - Uncalibrated light level in percentage 0-100%
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_LIGHT_SENSOR,
 
 	/// Water meter
-	/// MsgDeviceAccumulated - Accumulated water volume in m3 <int, float>
-	/// MsgDeviceRate - Flow rate in l/m <int or float>
+	/// MsgDeviceAccumulated* - Accumulated water volume in m3 <int, float>
+	/// MsgDeviceRate* - Flow rate in l/m <int or float>
 	DEV_WATER_METER,
 
 	/// Ph sensor (*)
-	/// MsgDeviceLevel (N) - Ph level using standard pH scale 0-14 <int or float>
+	/// MsgDeviceLevel* (N) - Ph level using standard pH scale 0-14 <int or float>
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_PH,
@@ -351,20 +382,20 @@ typedef enum {
 	DEV_SCENE_CONTROLLER,
 
 	/// Sound sensor (*)
-	/// MsgDeviceLevel (N/C) - Calibrated sound level in db
-	/// MsgDevicePercentage (N/U) - Uncalibrated sound level in percentage 0-100%
+	/// MsgDeviceLevel* (N/C) - Calibrated sound level in db
+	/// MsgDevicePercentage* (N/U) - Uncalibrated sound level in percentage 0-100%
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_SOUND,
 
 	/// Vibration sensor (*)
-	/// MsgDeviceLevel (N) - vibration level in Hertz
+	/// MsgDeviceLevel* (N) - vibration level in Hertz
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_VIBRATION,
 
 	/// Gyro sensor
-	/// Here we need some kind of value types. Help needed!
+	/// Here we need some kind of value types. But what? Help needed!
 	DEV_GYRO,
 
 	/// Compass sensor
@@ -384,12 +415,11 @@ typedef enum {
 	DEV_IR_RECEIVER,
 
 	/// A list of more or less common sensors  (*)
-	/// MsgDeviceLevel (N/C) - Gas level in ug/m3
-	/// MsgDevicePercentage (N/U) - Uncalibrated gas level
+	/// MsgDeviceLevel* (N/C) - Calibrated level in (gas in ug/m3)
+	/// MsgDevicePercentage* (N/U) - Uncalibrated level
 	/// MsgDeviceTripped (B)
 	/// MsgDeviceArmed (B)
 	DEV_ORP=100,			// Oxidation reduction potential sensor. Water quality (V/mV.).
-
 	DEV_DUST,				// Dust sensor
 	DEV_CARBON_MONOXIDE, 	// Carbon Monoxide – CO
 	DEV_CARBON_DIOXIDE, 	// Carbon Dioxide – CO2
@@ -430,14 +460,9 @@ typedef enum {
 typedef uint8_t  MySensorDeviceType;
 
 
-typedef enum {
-	P_STRING, P_BYTE, P_INT16, P_UINT16, P_LONG32, P_ULONG32, P_CUSTOM, P_FLOAT32
-};
-typedef uint8_t MySensorPayloadDataType;
 
-
-
-
+/// The network header contains information needed to route messages to their destination.
+/// It also contains QoS flags used for resending and acknowledgments.
 struct MyNetworkHeader {
 	/// Id of last node this message passed
 	uint8_t last;
@@ -488,12 +513,12 @@ struct MyNetworkHeader {
 };
 
 
-struct MsgType {
-	virtual MySensorMessageType getMessageType();
-};
+struct MyPayload {
 
-struct MyPayload : MsgType {
+	/// A node can report or control different attached devices. Each device has a static deviceId selected
+	/// by the programmer.
 	uint8_t deviceId;
+
 	/// 0-6: Length of payload.  .
 	///   7: Request flag. Send this to request a device value from other sensor or controller.
 	///      Should be replied with a normal message.
@@ -521,81 +546,113 @@ struct MyPayload : MsgType {
 			BF_SET(length_req, deviceId, 0, 7);
 	}
 
-	MySensorDeviceType getMessageType() { return 0; }
 
+	virtual MySensorMessageType getMessageType();
 
 };
 
-struct MySensorDynamicPayload : MyPayload {
-	/// Payload data type
-	MySensorPayloadDataType ptype;
 
-	/// Each message can transfer a payload. We add one extra byte for string
-	/// terminator \0 to be "printable" this is not transferred OTA
-	/// This union is used to simplify the construction of the binary data types transferred.
-	union {
-		uint8_t bValue;
-		uint32_t ulValue;
-		int32_t lValue;
-		uint16_t uiValue;
-		int16_t iValue;
-		struct { // Float messages
-			float fValue;
-			uint8_t fPrecision;   // Number of decimals when serializing
-		};
-		char data[MAX_PAYLOAD_SIZE + 1];
-	} __attribute__((packed));
+struct MsgDeviceLevelFloat : MyPayload {
+	float level;
+	MsgDeviceLevelFloat(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
+	MySensorDeviceType getMessageType() { return MSG_DEV_LEVEL_FLOAT; }
+};
 
-	char i2h(uint8_t i) const;
+struct MsgDeviceLevelInt : MyPayload {
+	int16_t level;
+	MsgDeviceLevelInt(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(2);}
+	MySensorDeviceType getMessageType() { return MSG_DEV_LEVEL_INT; }
+};
 
-	// If payload is something else than P_STRING you can have the payload value converted
-	// into string representation by supplying a buffer with the minimum size of
-	// 2*MAX_PAYLOAD+1. This is to be able to fit hex-conversion of a full binary payload.
-	char* getStream(char *buffer) const;
-	char* getString(char *buffer) const;
-	const char* getString() const;
-	void* getCustom() const;
-	uint8_t getByte() const;
-	bool getBool() const;
-	float getFloat() const;
-	long getLong() const;
-	unsigned long getULong() const;
-	int getInt() const;
-	unsigned int getUInt() const;
-
-
-	// Setters for payload
-	MyPayload& set(void* payload, uint8_t length);
-	MyPayload& set(const char* value);
-	MyPayload& set(uint8_t value);
-	MyPayload& set(float value, uint8_t decimals);
-	MyPayload& set(unsigned long value);
-	MyPayload& set(long value);
-	MyPayload& set(unsigned int value);
-	MyPayload& set(int value);
-
-	MySensorDynamicPayload(uint8_t deviceId = 0) : MyPayload(deviceId)  { }
-	MySensorDeviceType getMessageType() { return 0; }
+struct MsgDeviceLevelLong : MyPayload {
+	int32_t level;
+	MsgDeviceLevelLong(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
+	MySensorDeviceType getMessageType() { return MSG_DEV_LEVEL_LONG; }
 };
 
 
-struct MsgDeviceLevel : MySensorDynamicPayload {
-	MsgDeviceLevel(uint8_t deviceId = 0) : MySensorDynamicPayload(deviceId)  { }
 
-	MySensorDeviceType getMessageType() { return MSG_DEV_LEVEL; }
+struct MsgDeviceAccumulatedFloat : MyPayload {
+	float accumulated;
+	MsgDeviceAccumulatedFloat(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
+	MySensorDeviceType getMessageType() { return MSG_DEV_ACCUMULATED_FLOAT; }
 };
 
-struct MsgDeviceAccumulated : MySensorDynamicPayload {
-	MsgDeviceAccumulated(uint8_t deviceId = 0) : MySensorDynamicPayload(deviceId)  { }
-
-	MySensorDeviceType getMessageType() { return MSG_DEV_ACCUMULATED; }
+struct MsgDeviceAccumulatedInt : MyPayload {
+	int16_t accumulated;
+	MsgDeviceAccumulatedInt(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(2);}
+	MySensorDeviceType getMessageType() { return MSG_DEV_ACCUMULATED_INT; }
 };
 
-struct MsgDeviceRate : MySensorDynamicPayload {
-	MsgDeviceRate(uint8_t deviceId = 0) :  MySensorDynamicPayload(deviceId)  { }
-
-	MySensorDeviceType getMessageType() { return MSG_DEV_RATE; }
+struct MsgDeviceAccumulatedLong : MyPayload {
+	int32_t accumulated;
+	MsgDeviceAccumulatedLong(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
+	MySensorDeviceType getMessageType() { return MSG_DEV_ACCUMULATED_LONG; }
 };
+
+
+
+struct MsgDeviceRateFloat : MyPayload {
+	float rate;
+	MsgDeviceRateFloat(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
+	MySensorDeviceType getMessageType() { return MSG_DEV_RATE_FLOAT; }
+};
+
+struct MsgDeviceRateInt : MyPayload {
+	int16_t rate;
+	MsgDeviceRateInt(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(2);}
+	MySensorDeviceType getMessageType() { return MSG_DEV_RATE_INT; }
+};
+
+struct MsgDeviceRateLong : MyPayload {
+	int32_t rate;
+	MsgDeviceRateLong(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
+	MySensorDeviceType getMessageType() { return MSG_DEV_RATE_LONG; }
+};
+
+
+
+
+struct MsgDeviceVarFloat : MyPayload {
+	float var;
+	MsgDeviceVarFloat(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
+	MySensorDeviceType getMessageType() { return MSG_DEV_VAR_FLOAT; }
+};
+
+struct MsgDeviceVarInt : MyPayload {
+	int16_t var;
+	MsgDeviceVarInt(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(2);}
+	MySensorDeviceType getMessageType() { return MSG_DEV_VAR_INT; }
+};
+
+struct MsgDeviceVarLong : MyPayload {
+	int32_t var;
+	MsgDeviceVarLong(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
+	MySensorDeviceType getMessageType() { return MSG_DEV_VAR_LONG; }
+};
+
+struct MsgDeviceVarString : MyPayload {
+private:
+	char var[MAX_PAYLOAD_SIZE + 1];
+public:
+	void set(uint8_t *var) { setLength(length);}
+	char *get() {return var}
+	MsgDeviceVarString(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
+	MySensorDeviceType getMessageType() { return MSG_DEV_VAR_STRING; }
+};
+
+struct MsgDeviceVarCustom : MyPayload {
+private:
+	uint8_t var[MAX_PAYLOAD_SIZE + 1];
+public:
+	void set(uint8_t *var, uint8_t length) { setLength(length);}
+	MsgDeviceVarCustom(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
+	MySensorDeviceType getMessageType() { return MSG_DEV_VAR_CUSTOM; }
+};
+
+
+
+
 
 
 struct MsgDeviceVar : MySensorDynamicPayload {
@@ -700,15 +757,22 @@ struct MsgDeviceAngle : MyPayload {
 	MySensorDeviceType getMessageType() { return MSG_DEV_ANGLE; }
 };
 
-struct MsgDevicePower : MyPayload{
+struct MsgDevicePowerWatt : MyPayload {
 	/// Current watt value
-	uint8_t watt;
-	/// The Accumulated kwh
-	uint8_t kwh;
+	uint16_t watt;
 
 	MsgDevicePower(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(2);}
 	MySensorDeviceType getMessageType() { return MSG_DEV_POWER; }
 };
+
+struct MsgDevicePowerKWH : MyPayload {
+	/// The Accumulated kwh
+	uint32_t kwh;
+
+	MsgDevicePower(uint8_t deviceId = 0) : MyPayload(deviceId) { setLength(4);}
+	MySensorDeviceType getMessageType() { return MSG_DEV_POWER; }
+};
+
 
 typedef struct MsgDevicePercentage : MyPayload {
 	/// A Pecentage value between 0-100%
