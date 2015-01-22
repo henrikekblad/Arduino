@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+_MyTypeInfo *_MyTypeInfo::m_types = NULL;
+
 
 // Getters for payload converted to desired form
 void* MySensorDynamicPayload::getCustom() const {

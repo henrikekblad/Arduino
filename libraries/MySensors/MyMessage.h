@@ -76,7 +76,7 @@ typedef enum {
 	MSG_GATEWAY_READY,
 	/// Activate/deactivate inclusion mode. Used between gateway and controller. No OTA
 	MSG_INCLUSION_MODE,
-};
+} GatewayMessageId;
 
 /// Over the air message types
 typedef enum {
@@ -199,10 +199,7 @@ typedef enum {
 	MSG_DEV_IR_SEND,
 	MSG_DEV_IR_RECEIVED
 
-};
-typedef uint8_t MySensorMessageType;
-
-
+} MySensorMessageType;
 
 /**
  * The devices always report their data in SI units.
@@ -456,10 +453,7 @@ typedef enum {
 	/// If you find yourself using this it might be a candidate for a new device type?
 	DEV_CUSTOM=255,
 
-};
-typedef uint8_t  MySensorDeviceType;
-
-
+} MySensorDeviceType;
 
 /// The network header contains information needed to route messages to their destination.
 /// It also contains QoS flags used for resending and acknowledgments.
@@ -479,8 +473,8 @@ struct MyNetworkHeader {
 	/// 2-7: Reserved
 	uint8_t flags;
 
-	/// Message type
-	MySensorMessageType messageType;
+	/// Message type (MySensorMessageType)
+	uint8_t messageType;
 
 	/**
 	 * Getter for the is-ack-flag.
@@ -551,8 +545,79 @@ struct MyPayload {
 
 };
 
+/// Forward declarations
+class MyStaticRawMsgListener;
+struct MyMessageTypeDesc;
 
-struct MsgDeviceLevelFloat : MyPayload {
+/**
+ * Describes a message type.
+ */
+struct MyMessageTypeDesc {
+    /// List header for (the single linked list to) all registered message types
+    static MyMessageTypeDesc *allTypes = NULL;
+    MyMessageTypeDesc *next; ///< Pointer to next list item
+    MyStaticRawMsgListener *handlers;
+    uint8_t id; ///< MySensorMessageType
+    uint8_t size; ///< sizeof() message
+    const char *name; ///< Some readable message type name (optional, may be NULL)
+    inline MyMessageTypeDesc(uint8_t id, uint8_t size, const char *name = NULL) :
+        // static initialization fiasco thing... trust BSS initialization instead: handlers(NULL),
+	id(id), size(size), name(name)
+    {
+      // Add me to allTypes list
+        next = allTypes;
+        allTypes = this;
+    }
+    void handleUnsafeMessage(const void *msg, const MyNetworkHeader *h);
+};
+
+struct MyStaticRawMsgListener {
+    typedef void (*UntypedHandler)(const void *, const MyNetworkHeader *);
+    MyStaticRawMsgListener *nextHandler;
+    UntypedHandler actualHandler;
+    inline MyStaticRawMsgListener(UntypedHandler actualHandler) : m_handler(actualHandler) {}
+};
+
+// Important:
+// This template class cannot have any data members. (well, it can but it will cause invalid stuff to be sent..... hehe)
+// This class or any descendants must not have any virtual functions.
+// Static stuff are ok.
+template<typename T, int _id>
+class Proxy {
+    static MyMessageTypeDesc m_typedesc;
+public:
+    typedef T Type;
+    enum { MESSAGE_ID = _id };
+    bool send(uint8_t dest) {
+        return MySensor::send(dest, this, &m_typedesc);
+    }
+    static void registerHandler(MyStaticRawMsgListener *handlerEntry) {
+        handlerEntry->nextHandler = m_typeinfo.handlers;
+        m_typeinfo.handlers = handlerEntry;
+    }
+};
+template<typename T, int _id>
+MyMessageTypeDesc Proxy<T, _id>::m_typeinfo(_id, sizeof(T));
+
+
+class MyStaticMsgListener : protected MyStaticRawMsgListener {
+public:
+    template<typename T>
+    inline MyStaticMsgListener(void (*handler)(const T &)) :
+        MyStaticRawMsgListener((UntypedHandler)handler)
+    {
+        T::registerHandler(this);
+    }
+    template<typename T>
+    inline MyStaticMsgListener(void (*handler)(const T &, const MyNetworkHeader &)) :
+        MyStaticRawMsgListener((UntypedHandler)handler)
+    {
+        T::registerHandler(this);
+    }
+};
+
+
+struct MsgDeviceLevelFloat : Proxy<MsgDeviceLevelFloat, MySensorMessageType> {
 	float level;
 	MsgDeviceLevelFloat(uint8_t deviceId = 0) : MyPayload(deviceId)  { setLength(4); }
 	MySensorDeviceType getMessageType() { return MSG_DEV_LEVEL_FLOAT; }

@@ -73,6 +73,7 @@ struct NodeConfig
 class MySensor
 {
   public:
+    static MySensor *m_instance;
 	/**
 	* Constructor
 	*
@@ -136,6 +137,8 @@ class MySensor
 	* @return true if transmission to first hop in route to gateway was sucessful
 	*/
 	bool send(MyPayload &payload, const uint8_t destination=GATEWAY_ADDRESS, const bool ack=false);
+
+	static bool send(uint8_t dest, const void *data, const MyMessageTypeDesc *desc);
 
 	bool sendRoute(MyMessage &message, const uint8_t length);
 

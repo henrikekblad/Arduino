@@ -56,6 +56,7 @@ static inline bool isValidDistance( const uint8_t distance ) {
 
 
 MySensor::MySensor() {
+	m_instance = this;
 	driver = (MyDriver*) new MyDriverClass();
 }
 
@@ -117,6 +118,36 @@ void MySensor::begin(void (*_msgCallback)(const MyMessage &), uint8_t _nodeId, b
 
 	// Wait configuration reply.
 	waitForReply();
+}
+
+
+static _MyMessageTypeDesc *getMyMessageTypeDescriptor(uint8_t id) {
+    for (_MyMessageTypeDesc *p = _MyMessageTypeDesc::allTypes; p; p = p->next) {
+	if (p->id == id)
+	    return p;
+    }
+    return NULL;
+}
+
+static MySensor *MySensor::m_instance = NULL;
+
+bool MySensor::send(uint8_t dest, const void *data, const MyMessageTypeDesc *desc) 
+{
+  
+  // HERE WE ARE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //printf("SEND: dest=%hhu, id=%hhu (%s), data=", dest, id, getTypeName(id));
+    const uint8_t *p = static_cast<const uint8_t *>(data);
+    for (uint8_t l = len; l; l--)
+	printf("%02hhx ", *p++);
+    printf("\n");
+    // Pretend that we receive the same message here, with invalid len
+    handleIncoming(id, data, len - 1);
+    // Pretend that we receive the same message here, with unknown id
+    handleIncoming(76, data, len);
+    // Pretend that we receive the same message here. This one should work
+    handleIncoming(id, data, len);
+
+    return true;
 }
 
 
@@ -320,6 +351,9 @@ bool MySensor::process() {
 	uint8_t last = msg.header.last;
 	uint8_t destination = msg.header.destination;
 
+	if (len < sizeof(msg.header))
+	  return false;
+	
 	if (repeaterMode && type == MSG_FIND_PARENT_REQUEST) {
 		// Relaying nodes should always answer ping messages
 		// Wait a random delay of 0-1.023 seconds to minimize collision
@@ -392,8 +426,27 @@ bool MySensor::process() {
 
 		// Call incoming message callback if available
 		if (msgCallback != NULL) {
-			msgCallback(msg);
+			msgCallback(msg); // TODO: pass len
 		}
+
+		MyMessageTypeDesc *desc = getMyMessageTypeDescriptor(type);
+		if (!desc) {
+		    debug(PSTR("unknown msg type=%d\n"), type);
+		    return false;
+		}
+		len -= sizeof(msg.header);
+		if (len != desc->size) {
+		    debug(PSTR("unhandled msg size, %d != %d"), len, desc->size);
+		    return false;
+		}
+		if (!desc->handlers) {
+		    debug(PSTR("unhandled msg type=%d\n"), type);
+		    return false; // or true?
+		}
+		for (MyStaticRawMsgListener *p = handlers; p; p = p->nextHandler) {
+			p->actualHandler((const void *)msg.payload, msg.header);
+		}
+
 		// Return true if message was addressed for this node...
 		return true;
 	} else if (repeaterMode && to == nc.nodeId) {
