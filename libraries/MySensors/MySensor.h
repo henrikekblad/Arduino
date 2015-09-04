@@ -105,8 +105,8 @@ class MySensor
 	*
 	* @param deviceId Select a unique device id for the attached sensor. Choose a number between 0-254.
 	* @param deviceType The sensor type. See sensor typedef in MyMessage.h.
-	* @param binary mode. Some sensors support two modes of operation. Binary and Normal. See device descriptsion for more info.
-	* @param calibrated mode. Some sensors have two modes depeding on if they are calibrated or not. See device description.
+	* @param binary mode. Some sensors support two modes of operation. Binary and Normal. See device descriptions for more info.
+	* @param calibrated mode. Some sensors have two modes depending on if they are calibrated or not. See device description.
 	* @param ack Set this to true if you want destination node to send ack back to this node. Default is not to request any ack.
 	* @return true if transmission to first hop in route to gateway was sucessful
 	*/
@@ -117,7 +117,7 @@ class MySensor
 	 * @param name String containing a short Sketch name or NULL  if not applicable
 	 * @param version String containing a short Sketch version or NULL if not applicable
 	 * @param ack Set this to true if you want destination node to send ack back to this node. Default is not to request any ack.
-	 * @return true if transmission to first hop in route to gateway was sucessful
+	 * @return true if transmission to first hop in route to gateway was successful
 	 */
 	bool sendSketchInfo(const char *name, const char *version, bool ack=false);
 
@@ -134,7 +134,7 @@ class MySensor
 	* @param payload The message payload to send.
 	* @param destination The nodeId of other node in radio network. Default is gateway
 	* @param ack Set this to true if you want destination node to send ack back to this node. Default is not to request any ack.
-	* @return true if transmission to first hop in route to gateway was sucessful
+	* @return true if transmission to first hop in route to gateway was successful
 	*/
 	bool send(MyPayload &payload, const uint8_t destination=GATEWAY_ADDRESS, const bool ack=false);
 
@@ -146,7 +146,7 @@ class MySensor
 	 * Send this nodes battery level to gateway.
 	 * @param level Level between 0-100(%)
 	 * @param ack Set this to true if you want destination node to send ack back to this node. Default is not to request any ack.
-   	 * @return true if transmission to first hop in route to gateway was sucessful
+   	 * @return true if transmission to first hop in route to gateway was successful
 	 *
 	 */
 	bool sendBatteryLevel(uint8_t level, bool ack=false);
@@ -158,7 +158,7 @@ class MySensor
 	* @param deviceId  The device id to request data from. 0-255.
 	* @param messageType The message type to request
 	* @param destination The nodeId to request data from. Default is gateway(controller)
-	* @return true if transmission to first hop in route to gateway was sucessful
+	* @return true if transmission to first hop in route to gateway was successful
 	*/
 	bool request(uint8_t deviceId, MySensorMessageType messageType, uint8_t destination=GATEWAY_ADDRESS);
 
@@ -166,7 +166,7 @@ class MySensor
 	 * Requests time from controller. Answer will be delivered to callback.
 	 *
 	 * @param callback for time request. Incoming argument is seconds since 1970.
- 	 * @return true if transmission to first hop in route to gateway was sucessful
+ 	 * @return true if transmission to first hop in route to gateway was successful
 	 */
 	bool requestTime(void (* timeCallback)(unsigned long));
 
@@ -214,7 +214,7 @@ class MySensor
 	 * Sleep (PowerDownMode) the Arduino and radio. Wake up on timer or pin change.
 	 * See: http://arduino.cc/en/Reference/attachInterrupt for details on modes and which pin
 	 * is assigned to what interrupt. On Nano/Pro Mini: 0=Pin2, 1=Pin3
-	 * @param interrupt Interrupt that should trigger the wakeup
+	 * @param interrupt Interrupt that should trigger the wake-up
 	 * @param mode RISING, FALLING, CHANGE
 	 * @param ms Number of milliseconds to sleep or 0 to sleep forever
 	 * @return true if wake up was triggered by pin change and false means timer woke it up.
@@ -225,9 +225,9 @@ class MySensor
 	 * Sleep (PowerDownMode) the Arduino and radio. Wake up on timer or pin change for two separate interrupts.
 	 * See: http://arduino.cc/en/Reference/attachInterrupt for details on modes and which pin
 	 * is assigned to what interrupt. On Nano/Pro Mini: 0=Pin2, 1=Pin3
-	 * @param interrupt1 First interrupt that should trigger the wakeup
+	 * @param interrupt1 First interrupt that should trigger the wake-up
 	 * @param mode1 Mode for first interrupt (RISING, FALLING, CHANGE)
-	 * @param interrupt2 Second interrupt that should trigger the wakeup
+	 * @param interrupt2 Second interrupt that should trigger the wake-up
 	 * @param mode2 Mode for second interrupt (RISING, FALLING, CHANGE)
 	 * @param ms Number of milliseconds to sleep or 0 to sleep forever
 	 * @return Interrupt number wake up was triggered by pin change and negative if timer woke it up.
